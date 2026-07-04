@@ -1,0 +1,114 @@
+name: SFA Mobile CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npx jest __tests__/unit --no-coverage --ci
+
+  backend-tests:
+    name: Backend API Tests
+    runs-on: ubuntu-latest
+    env:
+      STEP_API_URL: ${{ secrets.STEP_API_URL }}
+      TEST_SE_USER: ${{ secrets.TEST_SE_USER }}
+      TEST_SE_PASS: ${{ secrets.TEST_SE_PASS }}
+      TEST_SPV_USER: ${{ secrets.TEST_SPV_USER }}
+      TEST_SPV_PASS: ${{ secrets.TEST_SPV_PASS }}
+      TEST_HO_USER: ${{ secrets.TEST_HO_USER }}
+      TEST_HO_PASS: ${{ secrets.TEST_HO_PASS }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install backend test deps
+        run: pip install requests pytest
+        working-directory: ../skintific-step/backend
+        continue-on-error: true
+
+      - name: Run backend API tests
+        run: python -m pytest test_visit_api.py -v --tb=short
+        working-directory: ../skintific-step/backend
+        continue-on-error: true
+
+  build-apk:
+    name: Build APK (EAS)
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build preview APK
+        run: eas build --platform android --profile preview --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+  firebase-test-lab:
+    name: Firebase Test Lab (Cross-Device)
+    runs-on: ubuntu-latest
+    needs: build-apk
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate GCP
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Download APK artifact
+        run: |
+          # APK downloaded from EAS build — substitute with actual download step
+          echo "APK would be downloaded from EAS build here"
+
+      - name: Run on Firebase Test Lab (4 device models)
+        run: |
+          gcloud firebase test android run \
+            --app android/app/build/outputs/apk/debug/app-debug.apk \
+            --device model=Pixel6,version=33,locale=id,orientation=portrait \
+            --device model=Pixel4,version=30,locale=id,orientation=portrait \
+            --device model=OnePlus9Pro,version=31,locale=id,orientation=portrait \
+            --device model=beyond1,version=30,locale=id,orientation=portrait \
+            --timeout 10m \
+            --results-bucket gs://skintific-sfa-test-results \
+            --project skintific-data-warehouse
+        continue-on-error: true

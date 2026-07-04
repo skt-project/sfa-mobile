@@ -1,0 +1,37 @@
+{
+  "test_lab": {
+    "android": {
+      "app": "android/app/build/outputs/apk/debug/app-debug.apk",
+      "test": "android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk",
+      "device": [
+        {
+          "model": "Pixel6",
+          "version": "33",
+          "locale": "id",
+          "orientation": "portrait"
+        },
+        {
+          "model": "Pixel4",
+          "version": "30",
+          "locale": "id",
+          "orientation": "portrait"
+        },
+        {
+          "model": "OnePlus9",
+          "version": "31",
+          "locale": "id",
+          "orientation": "portrait"
+        },
+        {
+          "model": "SamsungGalaxyS21",
+          "version": "31",
+          "locale": "id",
+          "orientation": "portrait"
+        }
+      ],
+      "timeout": "10m",
+      "results_bucket": "gs://skintific-sfa-test-results",
+      "results_dir": "sfa-mobile/{BUILD_ID}"
+    }
+  }
+}
