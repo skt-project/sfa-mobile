@@ -1,5 +1,4 @@
 import React, { useEffect, useRef } from "react";
-import { AppState, Platform } from "react-native";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuthStore } from "./src/store/authStore";
 import { useOfflineStore } from "./src/store/offlineStore";
