@@ -18,6 +18,7 @@ interface Props {
 
 export default function SEHomeScreen({ navigation }: Props) {
   const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const { isSyncing, pendingSyncCount, setSyncing, setPendingCount } = useOfflineStore();
   const [refreshing, setRefreshing] = useState(false);
   const today = format(new Date(), "yyyy-MM-dd");
@@ -72,11 +73,25 @@ export default function SEHomeScreen({ navigation }: Props) {
           <Text style={styles.greeting}>Halo, {user?.username} 👋</Text>
           <Text style={styles.dateText}>{todayLabel}</Text>
         </View>
-        {pendingSyncCount > 0 && (
-          <View style={styles.syncBadge}>
-            <Text style={styles.syncBadgeText}>{pendingSyncCount} pending</Text>
-          </View>
-        )}
+        <View style={styles.headerRight}>
+          {pendingSyncCount > 0 && (
+            <View style={styles.syncBadge}>
+              <Text style={styles.syncBadgeText}>{pendingSyncCount} pending</Text>
+            </View>
+          )}
+          <TouchableOpacity
+            style={styles.logoutBtn}
+            onPress={() =>
+              Alert.alert("Keluar", "Yakin ingin keluar?", [
+                { text: "Batal", style: "cancel" },
+                { text: "Keluar", style: "destructive", onPress: logout },
+              ])
+            }
+            testID="btn-logout"
+          >
+            <Text style={styles.logoutText}>Keluar</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* KPI Summary */}
@@ -148,7 +163,10 @@ export default function SEHomeScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F1F5F9" },
-  header: { backgroundColor: "#2563EB", padding: 20, paddingTop: 28, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
+  header: { backgroundColor: "#2563EB", padding: 20, paddingTop: 28, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  headerRight: { alignItems: "flex-end", gap: 6 },
+  logoutBtn: { backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  logoutText: { color: "#fff", fontSize: 13, fontWeight: "600" },
   greeting: { fontSize: 18, fontWeight: "700", color: "#fff" },
   dateText: { fontSize: 13, color: "#BFDBFE", marginTop: 2 },
   syncBadge: { backgroundColor: "#FCD34D", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },

@@ -1,9 +1,10 @@
 import React, { useCallback, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { listVisits } from "../../api/visit";
 import { getTeamKpi } from "../../api/dashboard";
+import { useAuthStore } from "../../store/authStore";
 
 interface Props {
   navigation: any;
@@ -12,6 +13,7 @@ interface Props {
 export default function SPVHomeScreen({ navigation }: Props) {
   const today = format(new Date(), "yyyy-MM-dd");
   const [refreshing, setRefreshing] = useState(false);
+  const logout = useAuthStore((s) => s.logout);
 
   const { data: pending, refetch: refetchPending } = useQuery({
     queryKey: ["visits", "pending-spv"],
@@ -39,8 +41,21 @@ export default function SPVHomeScreen({ navigation }: Props) {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
     >
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Dashboard SPV</Text>
-        <Text style={styles.headerDate}>{format(new Date(), "EEEE, d MMM yyyy")}</Text>
+        <View>
+          <Text style={styles.headerTitle}>Dashboard SPV</Text>
+          <Text style={styles.headerDate}>{format(new Date(), "EEEE, d MMM yyyy")}</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.logoutBtn}
+          onPress={() =>
+            Alert.alert("Keluar", "Yakin ingin keluar?", [
+              { text: "Batal", style: "cancel" },
+              { text: "Keluar", style: "destructive", onPress: logout },
+            ])
+          }
+        >
+          <Text style={styles.logoutText}>Keluar</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.kpiRow}>
@@ -86,9 +101,11 @@ export default function SPVHomeScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F1F5F9" },
-  header: { backgroundColor: "#1D4ED8", padding: 20, paddingTop: 28 },
+  header: { backgroundColor: "#1D4ED8", padding: 20, paddingTop: 28, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   headerTitle: { fontSize: 22, fontWeight: "700", color: "#fff" },
   headerDate: { fontSize: 13, color: "#BFDBFE", marginTop: 2 },
+  logoutBtn: { backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
+  logoutText: { color: "#fff", fontSize: 13, fontWeight: "600" },
   kpiRow: { flexDirection: "row", margin: 12, gap: 8 },
   kpiCard: { flex: 1, backgroundColor: "#fff", borderRadius: 10, padding: 14, alignItems: "center", elevation: 2 },
   kpiValue: { fontSize: 18, fontWeight: "700", color: "#1D4ED8" },
