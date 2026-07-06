@@ -314,6 +314,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
         data={filteredSkus}
         keyExtractor={(item) => item.sku_id}
         renderItem={renderItem}
+        style={styles.list}
         contentContainerStyle={styles.listContent}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
@@ -419,7 +420,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
-    maxHeight: 52,
+    // Explicit height (not maxHeight) so Yoga measures this correctly on all
+    // Android API levels; flexShrink: 0 prevents the tab row from being
+    // compressed when the FlatList claims its flex: 1 space.
+    height: 52,
+    flexShrink: 0,
   },
   tabBarContent: { paddingHorizontal: 12, alignItems: "center" },
   tab: {
@@ -456,7 +461,13 @@ const styles = StyleSheet.create({
   searchClear: { padding: 8, marginLeft: 6 },
   searchClearText: { fontSize: 22, color: "#94A3B8", lineHeight: 24 },
 
-  // ── List container ──
+  // ── List ──
+  // flex: 1 is required. Without it, Yoga gives FlatList 0 measured height in
+  // the column flex layout. On Android this causes elevated card children
+  // (elevation: 1) to paint above sibling views, creating the
+  // tabs/search-bar overlap. flex: 1 also properly constrains the scroll
+  // viewport so the footer stays fixed at the bottom.
+  list: { flex: 1 },
   listContent: { paddingBottom: 120 },
 
   // ── Status states ──
@@ -549,6 +560,13 @@ const styles = StyleSheet.create({
     width: 52,
     height: 44,
     textAlign: "center",
+    // Android's EditText widget adds implicit top/bottom padding (~4-6dp each)
+    // that is independent of React Native's padding style. Setting padding: 0
+    // removes that system padding so the bold 18px text is never clipped.
+    // textAlignVertical: "center" is required to vertically center the value
+    // when the system padding is removed.
+    padding: 0,
+    textAlignVertical: "center",
     fontSize: 18,
     fontWeight: "700",
     color: "#1E293B",
