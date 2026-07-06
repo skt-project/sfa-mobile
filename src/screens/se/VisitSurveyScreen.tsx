@@ -263,31 +263,38 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
         </View>
       </View>
 
-      {/* ── Brand tabs (hidden when only one brand) ── */}
+      {/* ── Brand tabs (hidden when only one brand) ──
+           The outer View owns the fixed height so Yoga measures it correctly.
+           Setting height directly on a ScrollView is unreliable — the ScrollView's
+           own flex logic can override the explicit height in some RN versions,
+           causing the row to collapse and the search bar to sit on top of it.
+           The inner ScrollView fills the View via flex: 1. */}
       {brands.length > 1 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.tabBar}
-          contentContainerStyle={styles.tabBarContent}
-        >
-          {[ALL_TAB, ...brands].map((tab) => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tab, activeTab === tab && styles.tabActive]}
-              onPress={() => {
-                setActiveTab(tab);
-                setSearch("");
-              }}
-            >
-              <Text
-                style={[styles.tabText, activeTab === tab && styles.tabTextActive]}
+        <View style={styles.tabBarWrapper}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.tabBarScroll}
+            contentContainerStyle={styles.tabBarContent}
+          >
+            {[ALL_TAB, ...brands].map((tab) => (
+              <TouchableOpacity
+                key={tab}
+                style={[styles.tab, activeTab === tab && styles.tabActive]}
+                onPress={() => {
+                  setActiveTab(tab);
+                  setSearch("");
+                }}
               >
-                {tab}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+                <Text
+                  style={[styles.tabText, activeTab === tab && styles.tabTextActive]}
+                >
+                  {tab}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
       )}
 
       {/* ── Search bar ── */}
@@ -406,6 +413,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    flexShrink: 0,
   },
   headerLeft: { flex: 1, marginRight: 12 },
   headerStore: { fontSize: 15, fontWeight: "700", color: "#fff" },
@@ -416,17 +424,19 @@ const styles = StyleSheet.create({
   ecText: { fontSize: 12, fontWeight: "600", color: "#fff" },
 
   // ── Brand tabs ──
-  tabBar: {
+  // tabBarWrapper (View) owns the fixed height — this is the key pattern.
+  // height/flexShrink on a ScrollView can be overridden by the ScrollView's own
+  // internal flex logic in some React Native versions; putting them on an outer
+  // View is always reliable. The ScrollView fills the View via flex: 1.
+  tabBarWrapper: {
+    height: 52,
+    flexShrink: 0,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
-    // Explicit height (not maxHeight) so Yoga measures this correctly on all
-    // Android API levels; flexShrink: 0 prevents the tab row from being
-    // compressed when the FlatList claims its flex: 1 space.
-    height: 52,
-    flexShrink: 0,
   },
-  tabBarContent: { paddingHorizontal: 12, alignItems: "center" },
+  tabBarScroll: { flex: 1 },
+  tabBarContent: { paddingHorizontal: 12, alignItems: "center", height: "100%" },
   tab: {
     paddingHorizontal: 18,
     paddingVertical: 12,
@@ -446,6 +456,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "#E2E8F0",
     flexDirection: "row",
     alignItems: "center",
+    flexShrink: 0,
   },
   searchInput: {
     flex: 1,
