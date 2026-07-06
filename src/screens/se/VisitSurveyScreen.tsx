@@ -16,7 +16,6 @@ import { useOfflineStore } from "../../store/offlineStore";
 import { checkout as apiCheckout } from "../../api/visit";
 import type { Sku, VisitItem, ScheduleStore, EffectiveCall } from "../../types";
 import { getCachedSkus, cacheSkus } from "../../db/schedule_cache";
-import { isOnline } from "../../sync/engine";
 
 interface Props {
   route: {
@@ -98,13 +97,15 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
   } = useQuery<Sku[]>({
     queryKey: ["products"],
     queryFn: async () => {
-      const online = await isOnline();
-      if (online) {
+      try {
         const r = await getApiClient().get("/product");
         await cacheSkus(r.data.items);
         return r.data.items;
+      } catch {
+        const cached = await getCachedSkus() as unknown as Sku[];
+        if (cached.length > 0) return cached;
+        throw new Error("Tidak dapat memuat produk");
       }
-      return getCachedSkus() as unknown as Sku[];
     },
     staleTime: 5 * 60 * 1000,
     retry: 1,
