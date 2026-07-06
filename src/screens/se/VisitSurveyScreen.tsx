@@ -90,6 +90,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState(ALL_TAB);
   const [search, setSearch] = useState("");
+  const [tabsOpen, setTabsOpen] = useState(true);
 
   const {
     data: skuData,
@@ -263,37 +264,49 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
         </View>
       </View>
 
-      {/* ── Brand tabs (hidden when only one brand) ──
-           The outer View owns the fixed height so Yoga measures it correctly.
-           Setting height directly on a ScrollView is unreliable — the ScrollView's
-           own flex logic can override the explicit height in some RN versions,
-           causing the row to collapse and the search bar to sit on top of it.
-           The inner ScrollView fills the View via flex: 1. */}
+      {/* ── Brand tabs — collapsible, compact padding ── */}
       {brands.length > 1 && (
         <View style={styles.tabBarWrapper}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.tabBarScroll}
-            contentContainerStyle={styles.tabBarContent}
+          {/* Toggle header: shows active brand + chevron */}
+          <TouchableOpacity
+            style={styles.tabBarToggle}
+            onPress={() => setTabsOpen((v) => !v)}
+            activeOpacity={0.7}
           >
-            {[ALL_TAB, ...brands].map((tab) => (
-              <TouchableOpacity
-                key={tab}
-                style={[styles.tab, activeTab === tab && styles.tabActive]}
-                onPress={() => {
-                  setActiveTab(tab);
-                  setSearch("");
-                }}
+            <Text style={styles.tabBarToggleLabel} numberOfLines={1}>
+              {activeTab === ALL_TAB ? "Semua Brand" : activeTab}
+            </Text>
+            <View style={{ transform: [{ rotate: tabsOpen ? "180deg" : "0deg" }] }}>
+              <Text style={styles.tabBarChevron}>▼</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Collapsible tab row — outer View owns the height for layout stability */}
+          {tabsOpen && (
+            <View style={styles.tabBarScrollOuter}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.tabBarScroll}
+                contentContainerStyle={styles.tabBarContent}
               >
-                <Text
-                  style={[styles.tabText, activeTab === tab && styles.tabTextActive]}
-                >
-                  {tab}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+                {[ALL_TAB, ...brands].map((tab) => (
+                  <TouchableOpacity
+                    key={tab}
+                    style={[styles.tab, activeTab === tab && styles.tabActive]}
+                    onPress={() => {
+                      setActiveTab(tab);
+                      setSearch("");
+                    }}
+                  >
+                    <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                      {tab}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
         </View>
       )}
 
@@ -423,23 +436,37 @@ const styles = StyleSheet.create({
   ecNo: { backgroundColor: "#64748B" },
   ecText: { fontSize: 12, fontWeight: "600", color: "#fff" },
 
-  // ── Brand tabs ──
-  // tabBarWrapper (View) owns the fixed height — this is the key pattern.
-  // height/flexShrink on a ScrollView can be overridden by the ScrollView's own
-  // internal flex logic in some React Native versions; putting them on an outer
-  // View is always reliable. The ScrollView fills the View via flex: 1.
+  // ── Brand tabs (collapsible) ──
   tabBarWrapper: {
-    height: 52,
     flexShrink: 0,
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
   },
+  // Toggle row — always visible, shows active brand + chevron
+  tabBarToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    height: 36,
+    gap: 8,
+  },
+  tabBarToggleLabel: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#475569",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  tabBarChevron: { fontSize: 10, color: "#94A3B8" },
+  // Outer View owns height so Yoga measures stably (not the ScrollView directly)
+  tabBarScrollOuter: { height: 38 },
   tabBarScroll: { flex: 1 },
-  tabBarContent: { paddingHorizontal: 12, alignItems: "center", height: "100%" },
+  tabBarContent: { paddingHorizontal: 12, alignItems: "center" },
   tab: {
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 6,        // reduced from 12
     borderRadius: 6,
     marginRight: 4,
   },
