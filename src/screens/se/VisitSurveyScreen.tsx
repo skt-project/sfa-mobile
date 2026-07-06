@@ -1,7 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
-  View, Text, StyleSheet, TouchableOpacity, Alert,
-  ActivityIndicator, ScrollView, TextInput,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+  TextInput,
+  FlatList,
+  ScrollView,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { getApiClient } from "../../api/client";
@@ -23,16 +30,65 @@ interface Props {
   navigation: any;
 }
 
-interface SkuRow extends Sku {
+const ALL_TAB = "Semua";
+
+// Memoized product card — only re-renders when its own qty changes.
+const SkuCard = React.memo(function SkuCard({
+  item,
+  qty,
+  onSetQty,
+}: {
+  item: Sku;
   qty: number;
-}
+  onSetQty: (id: string, qty: number) => void;
+}) {
+  return (
+    <View style={[styles.skuCard, qty > 0 && styles.skuCardActive]}>
+      <View style={styles.skuInfo}>
+        <Text style={styles.skuCode}>{item.sku_id}</Text>
+        <Text style={styles.skuName}>{item.sku_name}</Text>
+        {item.category ? <Text style={styles.skuCat}>{item.category}</Text> : null}
+      </View>
+      <View style={styles.qtyBlock}>
+        <TouchableOpacity
+          style={[styles.qtyBtn, qty === 0 && styles.qtyBtnDisabled]}
+          onPress={() => onSetQty(item.sku_id, qty - 1)}
+          disabled={qty === 0}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={[styles.qtyBtnText, qty === 0 && styles.qtyBtnTextDisabled]}>
+            −
+          </Text>
+        </TouchableOpacity>
+        <TextInput
+          style={[styles.qtyInput, qty > 0 && styles.qtyInputActive]}
+          value={String(qty)}
+          onChangeText={(v) => onSetQty(item.sku_id, parseInt(v) || 0)}
+          keyboardType="number-pad"
+          selectTextOnFocus
+        />
+        <TouchableOpacity
+          style={styles.qtyBtn}
+          onPress={() => onSetQty(item.sku_id, qty + 1)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Text style={styles.qtyBtnText}>+</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+});
 
 export default function VisitSurveyScreen({ route, navigation }: Props) {
   const { visitId, store, isOffline: offlineMode, localId } = route.params;
   const { updateLocalCheckout } = useOfflineStore();
-  const [skuRows, setSkuRows] = useState<SkuRow[]>([]);
+
+  // qty stored as a map so switching tabs preserves entered values
+  const [qtyMap, setQtyMap] = useState<Record<string, number>>({});
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState(ALL_TAB);
+  const [search, setSearch] = useState("");
 
   const { data: skuData, isLoading: skuLoading } = useQuery<Sku[]>({
     queryKey: ["skus"],
@@ -45,37 +101,83 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
       }
       return getCachedSkus() as unknown as Sku[];
     },
+    staleTime: 5 * 60 * 1000,
   });
 
-  useEffect(() => {
-    if (skuData && skuRows.length === 0) {
-      setSkuRows(skuData.map((s) => ({ ...s, qty: 0 })));
+  // Unique brands in order of first appearance
+  const brands = useMemo(() => {
+    if (!skuData) return [];
+    const seen = new Set<string>();
+    const list: string[] = [];
+    for (const s of skuData) {
+      if (s.brand && !seen.has(s.brand)) {
+        seen.add(s.brand);
+        list.push(s.brand);
+      }
     }
+    return list;
   }, [skuData]);
 
-  const totalDemand = skuRows.reduce((sum, r) => sum + r.qty * (r.stp ?? 0), 0);
-  const effectiveCall: EffectiveCall = totalDemand > 0 ? "YES" : "NO";
-  const filledCount = skuRows.filter((r) => r.qty > 0).length;
+  // Products for the active tab, filtered by search query
+  const filteredSkus = useMemo<Sku[]>(() => {
+    if (!skuData) return [];
+    let base =
+      activeTab === ALL_TAB ? skuData : skuData.filter((s) => s.brand === activeTab);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      base = base.filter(
+        (s) =>
+          s.sku_name.toLowerCase().includes(q) ||
+          s.sku_id.toLowerCase().includes(q),
+      );
+    }
+    return base;
+  }, [skuData, activeTab, search]);
 
-  const setQty = (skuId: string, qty: number) => {
-    setSkuRows((rows) =>
-      rows.map((r) => (r.sku_id === skuId ? { ...r, qty: Math.max(0, qty) } : r))
-    );
-  };
+  // Running totals derived from qtyMap + full sku list (not just visible tab)
+  const totalDemand = useMemo(
+    () =>
+      (skuData ?? []).reduce(
+        (sum, s) => sum + (qtyMap[s.sku_id] ?? 0) * (s.stp ?? 0),
+        0,
+      ),
+    [skuData, qtyMap],
+  );
+
+  const filledCount = useMemo(
+    () => Object.values(qtyMap).filter((q) => q > 0).length,
+    [qtyMap],
+  );
+
+  const effectiveCall: EffectiveCall = totalDemand > 0 ? "YES" : "NO";
+
+  // Stable updater — functional form avoids stale closure over qtyMap
+  const setQty = useCallback((skuId: string, qty: number) => {
+    setQtyMap((prev) => ({ ...prev, [skuId]: Math.max(0, qty) }));
+  }, []);
+
+  // renderItem closes over qtyMap (so it updates when qty changes), but
+  // SkuCard.memo bails out for cards whose qty value didn't change.
+  const renderItem = useCallback(
+    ({ item }: { item: Sku }) => (
+      <SkuCard item={item} qty={qtyMap[item.sku_id] ?? 0} onSetQty={setQty} />
+    ),
+    [qtyMap, setQty],
+  );
 
   const handleCheckout = async () => {
     setLoading(true);
     const now = new Date().toISOString();
-    const filledItems: VisitItem[] = skuRows
-      .filter((r) => r.qty > 0)
-      .map((r) => ({
-        sku_id: r.sku_id,
-        sku_name: r.sku_name,
-        brand: r.brand,
-        brand_group: r.brand_group,
-        category: r.category,
-        stp: r.stp ?? 0,
-        qty: r.qty,
+    const filledItems: VisitItem[] = (skuData ?? [])
+      .filter((s) => (qtyMap[s.sku_id] ?? 0) > 0)
+      .map((s) => ({
+        sku_id: s.sku_id,
+        sku_name: s.sku_name,
+        brand: s.brand,
+        brand_group: s.brand_group,
+        category: s.category,
+        stp: s.stp ?? 0,
+        qty: qtyMap[s.sku_id],
       }));
 
     try {
@@ -105,6 +207,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
         totalDemand,
         effectiveCall,
         isOffline: offlineMode,
+        items: filledItems,
       });
     } catch (e: any) {
       Alert.alert("Gagal", e?.response?.data?.detail ?? "Gagal menyimpan demand.");
@@ -118,10 +221,11 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
       {/* Sticky header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerStore} numberOfLines={1}>{store.store_name}</Text>
+          <Text style={styles.headerStore} numberOfLines={1}>
+            {store.store_name}
+          </Text>
           <Text style={styles.headerSub}>
-            {skuRows.length} produk
-            {filledCount > 0 ? ` · ${filledCount} diisi` : ""}
+            {filledCount > 0 ? `${filledCount} SKU diisi` : "Belum ada demand"}
           </Text>
         </View>
         <View style={styles.headerRight}>
@@ -137,95 +241,91 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
         </View>
       </View>
 
-      <ScrollView style={styles.list} contentContainerStyle={{ paddingBottom: 100 }}>
+      {/* Brand tabs (only shown when there are multiple brands) */}
+      {brands.length > 1 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabBar}
+          contentContainerStyle={styles.tabBarContent}
+        >
+          {[ALL_TAB, ...brands].map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, activeTab === tab && styles.tabActive]}
+              onPress={() => {
+                setActiveTab(tab);
+                setSearch("");
+              }}
+            >
+              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                {tab}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
-        {/* Instructions */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoText}>
-            Masukkan jumlah produk yang terjual ke konsumen akhir (sell-out).
-            Bukan pembelian dari salesman.
-          </Text>
-        </View>
-
-        {skuLoading && (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#2563EB" />
-            <Text style={styles.loadingText}>Memuat daftar produk...</Text>
-          </View>
+      {/* Search bar */}
+      <View style={styles.searchRow}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Cari nama atau kode produk..."
+          placeholderTextColor="#94A3B8"
+          value={search}
+          onChangeText={setSearch}
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch("")} style={styles.searchClear}>
+            <Text style={styles.searchClearText}>×</Text>
+          </TouchableOpacity>
         )}
+      </View>
 
-        {/* SKU rows */}
-        {skuRows.map((sku) => (
-          <View key={sku.sku_id} style={[styles.skuCard, sku.qty > 0 && styles.skuCardActive]}>
-            {/* Left: product info */}
-            <View style={styles.skuInfo}>
-              <View style={styles.skuCodeRow}>
-                <Text style={styles.skuCode}>{sku.sku_id}</Text>
-                {sku.brand_group && (
-                  <View style={[
-                    styles.brandBadge,
-                    sku.brand_group === "SKT" ? styles.brandSkt : styles.brandG2g,
-                  ]}>
-                    <Text style={styles.brandText}>{sku.brand_group}</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={styles.skuName}>{sku.sku_name}</Text>
-              {sku.category && (
-                <Text style={styles.skuSize}>{sku.category}</Text>
-              )}
-              <Text style={styles.skuStp}>
-                Rp {(sku.stp ?? 0).toLocaleString("id-ID")} / unit
+      {/* Virtualized product list */}
+      <FlatList
+        data={filteredSkus}
+        keyExtractor={(item) => item.sku_id}
+        renderItem={renderItem}
+        contentContainerStyle={{ paddingBottom: 110 }}
+        keyboardShouldPersistTaps="handled"
+        ListHeaderComponent={
+          skuLoading ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color="#2563EB" />
+              <Text style={styles.loadingText}>Memuat daftar produk...</Text>
+            </View>
+          ) : (
+            <View style={styles.infoBox}>
+              <Text style={styles.infoText}>
+                Masukkan jumlah produk yang terjual ke konsumen akhir (sell-out).
+                Bukan pembelian dari salesman.
               </Text>
             </View>
-
-            {/* Right: qty control */}
-            <View style={styles.qtyBlock}>
-              <TouchableOpacity
-                style={[styles.qtyBtn, sku.qty === 0 && styles.qtyBtnDisabled]}
-                onPress={() => setQty(sku.sku_id, sku.qty - 1)}
-                disabled={sku.qty === 0}
-                testID={`dec-${sku.sku_id}`}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={[styles.qtyBtnText, sku.qty === 0 && styles.qtyBtnTextDisabled]}>−</Text>
-              </TouchableOpacity>
-
-              <TextInput
-                style={[styles.qtyInput, sku.qty > 0 && styles.qtyInputActive]}
-                value={String(sku.qty)}
-                onChangeText={(v) => setQty(sku.sku_id, parseInt(v) || 0)}
-                keyboardType="number-pad"
-                selectTextOnFocus
-                testID={`qty-${sku.sku_id}`}
-              />
-
-              <TouchableOpacity
-                style={styles.qtyBtn}
-                onPress={() => setQty(sku.sku_id, sku.qty + 1)}
-                testID={`inc-${sku.sku_id}`}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <Text style={styles.qtyBtnText}>+</Text>
-              </TouchableOpacity>
-            </View>
+          )
+        }
+        ListEmptyComponent={
+          !skuLoading ? (
+            <Text style={styles.emptyText}>
+              {search ? "Tidak ada produk yang cocok." : "Tidak ada produk."}
+            </Text>
+          ) : null
+        }
+        ListFooterComponent={
+          <View style={styles.notesSection}>
+            <Text style={styles.notesLabel}>Catatan Kunjungan (opsional)</Text>
+            <TextInput
+              style={styles.notesInput}
+              value={notes}
+              onChangeText={setNotes}
+              multiline
+              numberOfLines={3}
+              placeholder="Kondisi toko, feedback pelanggan, kendala, dll..."
+              testID="input-notes"
+            />
           </View>
-        ))}
-
-        {/* Notes */}
-        <View style={styles.notesSection}>
-          <Text style={styles.notesLabel}>Catatan Kunjungan (opsional)</Text>
-          <TextInput
-            style={styles.notesInput}
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            numberOfLines={3}
-            placeholder="Kondisi toko, feedback pelanggan, kendala, dll..."
-            testID="input-notes"
-          />
-        </View>
-      </ScrollView>
+        }
+      />
 
       {/* Checkout button */}
       <View style={styles.footer}>
@@ -274,7 +374,43 @@ const styles = StyleSheet.create({
   ecNo: { backgroundColor: "#64748B" },
   ecText: { fontSize: 12, fontWeight: "600", color: "#fff" },
 
-  list: { flex: 1 },
+  tabBar: {
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+    maxHeight: 48,
+  },
+  tabBarContent: { paddingHorizontal: 8, alignItems: "center" },
+  tab: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 6, marginRight: 4 },
+  tabActive: { backgroundColor: "#EFF6FF" },
+  tabText: { fontSize: 13, color: "#64748B", fontWeight: "500" },
+  tabTextActive: { color: "#2563EB", fontWeight: "700" },
+
+  searchRow: {
+    backgroundColor: "#fff",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E2E8F0",
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  searchInput: {
+    flex: 1,
+    backgroundColor: "#F8FAFC",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    color: "#1E293B",
+  },
+  searchClear: { padding: 8, marginLeft: 4 },
+  searchClearText: { fontSize: 22, color: "#94A3B8", lineHeight: 24 },
+
+  loadingBox: { padding: 40, alignItems: "center", gap: 12 },
+  loadingText: { color: "#64748B", fontSize: 14 },
 
   infoBox: {
     backgroundColor: "#EFF6FF",
@@ -287,8 +423,7 @@ const styles = StyleSheet.create({
   },
   infoText: { fontSize: 12, color: "#1D4ED8", lineHeight: 18 },
 
-  loadingBox: { padding: 40, alignItems: "center", gap: 12 },
-  loadingText: { color: "#64748B", fontSize: 14 },
+  emptyText: { textAlign: "center", color: "#94A3B8", marginTop: 32, fontSize: 14 },
 
   skuCard: {
     backgroundColor: "#fff",
@@ -303,17 +438,10 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   skuCardActive: { borderColor: "#BFDBFE", backgroundColor: "#F0F7FF" },
-
   skuInfo: { flex: 1, marginRight: 12 },
-  skuCodeRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 2 },
-  skuCode: { fontSize: 11, color: "#94A3B8", fontFamily: "monospace" },
-  brandBadge: { borderRadius: 3, paddingHorizontal: 5, paddingVertical: 1 },
-  brandSkt: { backgroundColor: "#DBEAFE" },
-  brandG2g: { backgroundColor: "#FCE7F3" },
-  brandText: { fontSize: 10, fontWeight: "600", color: "#475569" },
+  skuCode: { fontSize: 11, color: "#94A3B8", fontFamily: "monospace", marginBottom: 2 },
   skuName: { fontSize: 14, fontWeight: "600", color: "#1E293B", lineHeight: 20 },
-  skuSize: { fontSize: 12, color: "#64748B", marginTop: 1 },
-  skuStp: { fontSize: 12, color: "#94A3B8", marginTop: 2 },
+  skuCat: { fontSize: 12, color: "#64748B", marginTop: 1 },
 
   qtyBlock: { alignItems: "center" },
   qtyBtn: {
@@ -340,7 +468,13 @@ const styles = StyleSheet.create({
   },
   qtyInputActive: { borderBottomColor: "#2563EB", color: "#1D4ED8" },
 
-  notesSection: { backgroundColor: "#fff", margin: 12, borderRadius: 10, padding: 14 },
+  notesSection: {
+    backgroundColor: "#fff",
+    margin: 12,
+    marginTop: 16,
+    borderRadius: 10,
+    padding: 14,
+  },
   notesLabel: { fontSize: 14, fontWeight: "600", color: "#475569", marginBottom: 8 },
   notesInput: {
     borderWidth: 1,
@@ -352,7 +486,12 @@ const styles = StyleSheet.create({
     minHeight: 80,
   },
 
-  footer: { padding: 12, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#E2E8F0" },
+  footer: {
+    padding: 12,
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderTopColor: "#E2E8F0",
+  },
   checkoutBtn: {
     backgroundColor: "#2563EB",
     borderRadius: 12,
