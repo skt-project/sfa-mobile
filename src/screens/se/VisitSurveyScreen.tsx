@@ -46,7 +46,9 @@ const SkuCard = React.memo(function SkuCard({
       <View style={styles.skuInfo}>
         <Text style={styles.skuCode}>{item.sku_id}</Text>
         <Text style={styles.skuName}>{item.sku_name}</Text>
-        {item.category ? <Text style={styles.skuCat}>{item.category}</Text> : null}
+        {item.category ? (
+          <Text style={styles.skuCat}>{item.category}</Text>
+        ) : null}
       </View>
       <View style={styles.qtyBlock}>
         <TouchableOpacity
@@ -98,11 +100,16 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
     queryKey: ["products"],
     queryFn: async () => {
       try {
+        // Always attempt API first. Filtering by brand_group is enforced
+        // server-side based on the JWT token — salesman only receives
+        // products in their assigned business group.
         const r = await getApiClient().get("/product");
         await cacheSkus(r.data.items);
         return r.data.items;
       } catch {
-        const cached = await getCachedSkus() as unknown as Sku[];
+        // Fall back to SQLite cache (offline). Re-throw if cache is empty
+        // so the retry button surfaces instead of a silent empty list.
+        const cached = (await getCachedSkus()) as unknown as Sku[];
         if (cached.length > 0) return cached;
         throw new Error("Tidak dapat memuat produk");
       }
@@ -111,7 +118,8 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
     retry: 1,
   });
 
-  // Unique brands in order of first appearance
+  // Unique brands derived from the (already-filtered) server response.
+  // Tab list is safe — it can never show brands outside the user's group.
   const brands = useMemo(() => {
     if (!skuData) return [];
     const seen = new Set<string>();
@@ -125,11 +133,13 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
     return list;
   }, [skuData]);
 
-  // Products for the active tab, filtered by search query
+  // Products visible in the active tab, further narrowed by search query
   const filteredSkus = useMemo<Sku[]>(() => {
     if (!skuData) return [];
     let base =
-      activeTab === ALL_TAB ? skuData : skuData.filter((s) => s.brand === activeTab);
+      activeTab === ALL_TAB
+        ? skuData
+        : skuData.filter((s) => s.brand === activeTab);
     if (search.trim()) {
       const q = search.toLowerCase();
       base = base.filter(
@@ -141,23 +151,21 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
     return base;
   }, [skuData, activeTab, search]);
 
-  // SKUs with qty > 0 — drives effectiveCall and checkout button
+  // Totals derived from the full product list (not just the visible tab)
   const filledCount = useMemo(
     () => Object.values(qtyMap).filter((q) => q > 0).length,
     [qtyMap],
   );
 
-  // Total pcs across all filled SKUs (qty-based, no Rp)
   const totalQty = useMemo(
     () => Object.values(qtyMap).reduce((sum, q) => sum + q, 0),
     [qtyMap],
   );
 
-  // Effective Call is qty-based: any product with qty > 0 makes the call effective
+  // Effective Call = any product with qty > 0 (qty-based, not monetary)
   const effectiveCall: EffectiveCall = filledCount > 0 ? "YES" : "NO";
 
-  // totalDemand (Rp) is still calculated and sent to backend for STEP Web reporting,
-  // but is never displayed in the mobile UI.
+  // totalDemand is computed for backend reporting only — never shown in UI
   const totalDemand = useMemo(
     () =>
       (skuData ?? []).reduce(
@@ -167,13 +175,10 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
     [skuData, qtyMap],
   );
 
-  // Stable updater — functional form avoids stale closure over qtyMap
   const setQty = useCallback((skuId: string, qty: number) => {
     setQtyMap((prev) => ({ ...prev, [skuId]: Math.max(0, qty) }));
   }, []);
 
-  // renderItem closes over qtyMap (so it updates when qty changes), but
-  // SkuCard.memo bails out for cards whose qty value didn't change.
   const renderItem = useCallback(
     ({ item }: { item: Sku }) => (
       <SkuCard item={item} qty={qtyMap[item.sku_id] ?? 0} onSetQty={setQty} />
@@ -234,7 +239,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* Sticky header */}
+      {/* ── Header ── */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Text style={styles.headerStore} numberOfLines={1}>
@@ -247,7 +252,10 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
           </Text>
         </View>
         <View
-          style={[styles.ecBadge, effectiveCall === "YES" ? styles.ecYes : styles.ecNo]}
+          style={[
+            styles.ecBadge,
+            effectiveCall === "YES" ? styles.ecYes : styles.ecNo,
+          ]}
         >
           <Text style={styles.ecText}>
             {effectiveCall === "YES" ? "✓ Efektif" : "✗ Tidak Efektif"}
@@ -255,7 +263,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
         </View>
       </View>
 
-      {/* Brand tabs (only shown when there are multiple brands) */}
+      {/* ── Brand tabs (hidden when only one brand) ── */}
       {brands.length > 1 && (
         <ScrollView
           horizontal
@@ -272,7 +280,9 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
                 setSearch("");
               }}
             >
-              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+              <Text
+                style={[styles.tabText, activeTab === tab && styles.tabTextActive]}
+              >
                 {tab}
               </Text>
             </TouchableOpacity>
@@ -280,7 +290,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
         </ScrollView>
       )}
 
-      {/* Search bar */}
+      {/* ── Search bar ── */}
       <View style={styles.searchRow}>
         <TextInput
           style={styles.searchInput}
@@ -290,18 +300,21 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
           onChangeText={setSearch}
         />
         {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch("")} style={styles.searchClear}>
+          <TouchableOpacity
+            onPress={() => setSearch("")}
+            style={styles.searchClear}
+          >
             <Text style={styles.searchClearText}>×</Text>
           </TouchableOpacity>
         )}
       </View>
 
-      {/* Virtualized product list */}
+      {/* ── Virtualized product list ── */}
       <FlatList
         data={filteredSkus}
         keyExtractor={(item) => item.sku_id}
         renderItem={renderItem}
-        contentContainerStyle={{ paddingBottom: 110 }}
+        contentContainerStyle={styles.listContent}
         keyboardShouldPersistTaps="handled"
         ListHeaderComponent={
           skuLoading ? (
@@ -314,7 +327,10 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
               <Text style={styles.errorText}>
                 Gagal memuat produk. Periksa koneksi internet.
               </Text>
-              <TouchableOpacity style={styles.retryBtn} onPress={() => refetchSkus()}>
+              <TouchableOpacity
+                style={styles.retryBtn}
+                onPress={() => refetchSkus()}
+              >
                 <Text style={styles.retryBtnText}>Coba Lagi</Text>
               </TouchableOpacity>
             </View>
@@ -330,7 +346,9 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
         ListEmptyComponent={
           !skuLoading && !skuError ? (
             <Text style={styles.emptyText}>
-              {search ? "Tidak ada produk yang cocok." : "Tidak ada produk."}
+              {search
+                ? "Tidak ada produk yang cocok."
+                : "Tidak ada produk."}
             </Text>
           ) : null
         }
@@ -350,7 +368,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
         }
       />
 
-      {/* Checkout button */}
+      {/* ── Checkout footer ── */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.checkoutBtn, loading && styles.btnDisabled]}
@@ -379,37 +397,46 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#F1F5F9" },
 
+  // ── Header ──
   header: {
     backgroundColor: "#1D4ED8",
-    padding: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
   headerLeft: { flex: 1, marginRight: 12 },
   headerStore: { fontSize: 15, fontWeight: "700", color: "#fff" },
-  headerSub: { fontSize: 12, color: "#BFDBFE", marginTop: 2 },
-  ecBadge: { borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
+  headerSub: { fontSize: 12, color: "#BFDBFE", marginTop: 3 },
+  ecBadge: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5 },
   ecYes: { backgroundColor: "#16A34A" },
   ecNo: { backgroundColor: "#64748B" },
   ecText: { fontSize: 12, fontWeight: "600", color: "#fff" },
 
+  // ── Brand tabs ──
   tabBar: {
     backgroundColor: "#fff",
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
-    maxHeight: 48,
+    maxHeight: 52,
   },
-  tabBarContent: { paddingHorizontal: 8, alignItems: "center" },
-  tab: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 6, marginRight: 4 },
+  tabBarContent: { paddingHorizontal: 12, alignItems: "center" },
+  tab: {
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 6,
+    marginRight: 4,
+  },
   tabActive: { backgroundColor: "#EFF6FF" },
   tabText: { fontSize: 13, color: "#64748B", fontWeight: "500" },
   tabTextActive: { color: "#2563EB", fontWeight: "700" },
 
+  // ── Search ──
   searchRow: {
     backgroundColor: "#fff",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#E2E8F0",
     flexDirection: "row",
@@ -421,30 +448,40 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: "#E2E8F0",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     fontSize: 14,
     color: "#1E293B",
   },
-  searchClear: { padding: 8, marginLeft: 4 },
+  searchClear: { padding: 8, marginLeft: 6 },
   searchClearText: { fontSize: 22, color: "#94A3B8", lineHeight: 24 },
 
-  loadingBox: { padding: 40, alignItems: "center", gap: 12 },
-  loadingText: { color: "#64748B", fontSize: 14 },
+  // ── List container ──
+  listContent: { paddingBottom: 120 },
 
-  errorBox: { padding: 32, alignItems: "center", gap: 12 },
-  errorText: { color: "#DC2626", fontSize: 14, textAlign: "center", lineHeight: 20 },
+  // ── Status states ──
+  loadingBox: { padding: 48, alignItems: "center", gap: 14 },
+  loadingText: { color: "#64748B", fontSize: 14 },
+  errorBox: { padding: 36, alignItems: "center", gap: 14 },
+  errorText: {
+    color: "#DC2626",
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 22,
+  },
   retryBtn: {
     backgroundColor: "#2563EB",
     borderRadius: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
   },
   retryBtnText: { color: "#fff", fontWeight: "600", fontSize: 14 },
 
+  // ── Info banner ──
   infoBox: {
     backgroundColor: "#EFF6FF",
-    margin: 12,
+    marginHorizontal: 16,
+    marginTop: 12,
     marginBottom: 4,
     borderRadius: 8,
     padding: 12,
@@ -453,14 +490,20 @@ const styles = StyleSheet.create({
   },
   infoText: { fontSize: 12, color: "#1D4ED8", lineHeight: 18 },
 
-  emptyText: { textAlign: "center", color: "#94A3B8", marginTop: 32, fontSize: 14 },
+  emptyText: {
+    textAlign: "center",
+    color: "#94A3B8",
+    marginTop: 36,
+    fontSize: 14,
+  },
 
+  // ── Product card ──
   skuCard: {
     backgroundColor: "#fff",
-    marginHorizontal: 12,
-    marginTop: 6,
+    marginHorizontal: 16,
+    marginVertical: 5,
     borderRadius: 10,
-    padding: 14,
+    padding: 16,
     flexDirection: "row",
     alignItems: "center",
     elevation: 1,
@@ -468,26 +511,43 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
   },
   skuCardActive: { borderColor: "#BFDBFE", backgroundColor: "#F0F7FF" },
-  skuInfo: { flex: 1, marginRight: 12 },
-  skuCode: { fontSize: 11, color: "#94A3B8", fontFamily: "monospace", marginBottom: 2 },
-  skuName: { fontSize: 14, fontWeight: "600", color: "#1E293B", lineHeight: 20 },
-  skuCat: { fontSize: 12, color: "#64748B", marginTop: 1 },
+  skuInfo: { flex: 1, marginRight: 16 },
+  skuCode: {
+    fontSize: 11,
+    color: "#94A3B8",
+    fontFamily: "monospace",
+    marginBottom: 3,
+    letterSpacing: 0.3,
+  },
+  skuName: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#1E293B",
+    lineHeight: 22,
+  },
+  skuCat: { fontSize: 12, color: "#64748B", marginTop: 3 },
 
-  qtyBlock: { alignItems: "center" },
+  // ── Qty controls — 44×44 minimum touch target ──
+  qtyBlock: { alignItems: "center", flexDirection: "row" },
   qtyBtn: {
     backgroundColor: "#EFF6FF",
     borderRadius: 8,
-    width: 38,
-    height: 38,
+    width: 44,
+    height: 44,
     justifyContent: "center",
     alignItems: "center",
   },
   qtyBtnDisabled: { backgroundColor: "#F1F5F9" },
-  qtyBtnText: { fontSize: 20, color: "#2563EB", fontWeight: "700", lineHeight: 24 },
+  qtyBtnText: {
+    fontSize: 22,
+    color: "#2563EB",
+    fontWeight: "700",
+    lineHeight: 26,
+  },
   qtyBtnTextDisabled: { color: "#CBD5E1" },
   qtyInput: {
-    width: 48,
-    height: 38,
+    width: 52,
+    height: 44,
     textAlign: "center",
     fontSize: 18,
     fontWeight: "700",
@@ -498,26 +558,36 @@ const styles = StyleSheet.create({
   },
   qtyInputActive: { borderBottomColor: "#2563EB", color: "#1D4ED8" },
 
+  // ── Notes ──
   notesSection: {
     backgroundColor: "#fff",
-    margin: 12,
+    marginHorizontal: 16,
     marginTop: 16,
+    marginBottom: 8,
     borderRadius: 10,
-    padding: 14,
+    padding: 16,
   },
-  notesLabel: { fontSize: 14, fontWeight: "600", color: "#475569", marginBottom: 8 },
+  notesLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#475569",
+    marginBottom: 10,
+  },
   notesInput: {
     borderWidth: 1,
     borderColor: "#CBD5E1",
     borderRadius: 8,
-    padding: 10,
+    padding: 12,
     fontSize: 14,
     textAlignVertical: "top",
     minHeight: 80,
+    color: "#1E293B",
   },
 
+  // ── Footer checkout button ──
   footer: {
-    padding: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: "#fff",
     borderTopWidth: 1,
     borderTopColor: "#E2E8F0",
@@ -525,10 +595,19 @@ const styles = StyleSheet.create({
   checkoutBtn: {
     backgroundColor: "#2563EB",
     borderRadius: 12,
-    padding: 14,
+    paddingVertical: 15,
     alignItems: "center",
   },
   btnDisabled: { opacity: 0.6 },
-  checkoutBtnText: { color: "#fff", fontSize: 16, fontWeight: "700", letterSpacing: 0.5 },
-  checkoutBtnSub: { color: "rgba(255,255,255,0.75)", fontSize: 12, marginTop: 3 },
+  checkoutBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
+    letterSpacing: 0.5,
+  },
+  checkoutBtnSub: {
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 12,
+    marginTop: 4,
+  },
 });
