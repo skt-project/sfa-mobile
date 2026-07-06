@@ -274,7 +274,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
             activeOpacity={0.7}
           >
             <Text style={styles.tabBarToggleLabel} numberOfLines={1}>
-              {activeTab === ALL_TAB ? "Semua Brand" : activeTab}
+              Brand
             </Text>
             <View style={{ transform: [{ rotate: tabsOpen ? "180deg" : "0deg" }] }}>
               <Text style={styles.tabBarChevron}>▼</Text>
