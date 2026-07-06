@@ -11,6 +11,8 @@ import RouteListScreen from "../screens/se/RouteListScreen";
 import VisitCheckinScreen from "../screens/se/VisitCheckinScreen";
 import VisitSurveyScreen from "../screens/se/VisitSurveyScreen";
 import VisitCheckoutScreen from "../screens/se/VisitCheckoutScreen";
+import VisitHistoryScreen from "../screens/se/VisitHistoryScreen";
+import VisitDetailScreen from "../screens/se/VisitDetailScreen";
 import SPVHomeScreen from "../screens/spv/SPVHomeScreen";
 import ApprovalQueueScreen from "../screens/spv/ApprovalQueueScreen";
 import TeamOverviewScreen from "../screens/spv/TeamOverviewScreen";
@@ -104,8 +106,10 @@ export default function RootNavigator() {
             <Stack.Screen name="SETabs" component={SETabNavigator} />
             <Stack.Screen name="RouteList" component={RouteListScreen} options={{ headerShown: true, title: "Rute Hari Ini" }} />
             <Stack.Screen name="VisitCheckin" component={VisitCheckinScreen as any} options={{ headerShown: true, title: "Check-in" }} />
-            <Stack.Screen name="VisitSurvey" component={VisitSurveyScreen as any} options={{ headerShown: true, title: "Survey" }} />
+            <Stack.Screen name="VisitSurvey" component={VisitSurveyScreen as any} options={{ headerShown: true, title: "Input Demand" }} />
             <Stack.Screen name="VisitCheckout" component={VisitCheckoutScreen as any} options={{ headerShown: true, title: "Checkout" }} />
+            <Stack.Screen name="VisitHistory" component={VisitHistoryScreen as any} options={{ headerShown: true, title: "Riwayat Kunjungan" }} />
+            <Stack.Screen name="VisitDetail" component={VisitDetailScreen as any} options={{ headerShown: true, title: "Detail Kunjungan" }} />
           </>
         )}
       </Stack.Navigator>

@@ -7,12 +7,13 @@
  */
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
-import { apiClient } from "../api/client";
+import { getApiClient } from "../api/client";
 
 // Show alerts + play sound when app is in foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
-    shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: false,
   }),
@@ -46,7 +47,7 @@ export async function registerPushToken(): Promise<void> {
   }
 
   // Register the token with our backend
-  await apiClient.post("/notifications/register-push-token", {
+  await getApiClient().post("/notifications/register-push-token", {
     push_token: pushToken,
   });
 }

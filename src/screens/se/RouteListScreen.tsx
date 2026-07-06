@@ -70,9 +70,14 @@ export default function RouteListScreen({ navigation }: Props) {
     }
   };
 
-  const isStoreVisited = (store: ScheduleStore) =>
-    localVisits.some((v) => v.outlet_sk === store.outlet_sk) ||
-    store.isVisited;
+  // A store is only "visited" (checked ✓) when the full flow is complete:
+  // check-in + demand entry + check-out. Partial visits (check-in only) stay pending.
+  const isStoreVisited = (store: ScheduleStore) => {
+    const completedLocally = localVisits.some(
+      (v) => v.outlet_sk === store.outlet_sk && !!v.checkout_time
+    );
+    return completedLocally || !!store.isVisited;
+  };
 
   const todayDayName = getTodayDayName();
   const displayStores = (allStores || []).filter(

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   View, Text, StyleSheet, TouchableOpacity, Alert,
-  ActivityIndicator, ScrollView, Platform,
+  ActivityIndicator, ScrollView, Platform, Image,
 } from "react-native";
 import * as Location from "expo-location";
 import * as ImagePicker from "expo-image-picker";
@@ -25,6 +25,7 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [gpsStatus, setGpsStatus] = useState<"idle" | "fetching" | "done" | "failed">("idle");
+  const [photoError, setPhotoError] = useState(false);
 
   useEffect(() => {
     fetchGPS();
@@ -34,7 +35,6 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
     setGpsStatus("fetching");
     try {
       if (Platform.OS === "web") {
-        // Use browser geolocation on web
         await new Promise<void>((resolve) => {
           navigator.geolocation.getCurrentPosition(
             (pos) => {
@@ -49,10 +49,7 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
         return;
       }
       const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        setGpsStatus("failed");
-        return;
-      }
+      if (status !== "granted") { setGpsStatus("failed"); return; }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
       setCoords({ lat: loc.coords.latitude, lon: loc.coords.longitude });
       setGpsStatus("done");
@@ -62,7 +59,6 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
   };
 
   const pickPhoto = async () => {
-    // Web: camera not available — use image library picker instead
     const pickerFn =
       Platform.OS === "web"
         ? ImagePicker.launchImageLibraryAsync
@@ -74,10 +70,17 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
     });
     if (!result.canceled && result.assets[0]) {
       setPhotoUri(result.assets[0].uri);
+      setPhotoError(false);
     }
   };
 
   const handleCheckin = async () => {
+    // Photo is mandatory
+    if (!photoUri) {
+      setPhotoError(true);
+      return;
+    }
+
     setLoading(true);
     const now = new Date().toISOString();
     const today = format(new Date(), "yyyy-MM-dd");
@@ -87,7 +90,6 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
       const online = await isOnline();
 
       if (online && !isOffline) {
-        // Online: send directly to server
         const resp = await apiCheckin({
           salesman_sk: salesmanSk,
           outlet_sk: store.outlet_sk ?? "",
@@ -114,7 +116,6 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
           localId: null,
         });
       } else {
-        // Offline: save locally
         const local = await addLocalCheckin({
           salesman_sk: salesmanSk,
           outlet_sk: store.outlet_sk,
@@ -125,7 +126,7 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
           checkin_time: now,
           checkin_lat: coords?.lat,
           checkin_lon: coords?.lon,
-          checkin_photo_path: photoUri ?? undefined,
+          checkin_photo_path: photoUri,
           total_demand: 0,
           effective_call: "NO",
         });
@@ -143,6 +144,8 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
       setLoading(false);
     }
   };
+
+  const canCheckin = !!photoUri;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ padding: 16 }}>
@@ -177,16 +180,51 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
         <Text style={styles.gpsNote}>GPS direkam sebagai informasi saja, bukan validasi.</Text>
       </View>
 
-      {/* Photo */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Foto Check-in (opsional)</Text>
-        <TouchableOpacity style={styles.photoButton} onPress={pickPhoto} testID="btn-photo">
-          <Text style={styles.photoButtonText}>
-            {photoUri
-              ? "✓ Foto diambil — Ganti"
-              : Platform.OS === "web" ? "📁  Pilih Foto" : "📷  Ambil Foto"}
-          </Text>
-        </TouchableOpacity>
+      {/* Photo — MANDATORY */}
+      <View style={[styles.section, photoError && styles.sectionError]}>
+        <View style={styles.photoHeader}>
+          <Text style={styles.sectionTitle}>Foto Toko</Text>
+          <View style={styles.requiredBadge}>
+            <Text style={styles.requiredText}>WAJIB</Text>
+          </View>
+        </View>
+
+        {photoUri ? (
+          <View>
+            <Image
+              source={{ uri: photoUri }}
+              style={styles.photoPreview}
+              resizeMode="cover"
+            />
+            <TouchableOpacity style={styles.photoButtonRetake} onPress={pickPhoto} testID="btn-photo">
+              <Text style={styles.photoButtonRetakeText}>
+                {Platform.OS === "web" ? "📁  Ganti Foto" : "📷  Ambil Ulang"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[styles.photoButton, photoError && styles.photoButtonError]}
+            onPress={pickPhoto}
+            testID="btn-photo"
+          >
+            <Text style={styles.cameraIcon}>📷</Text>
+            <Text style={styles.photoButtonText}>
+              {Platform.OS === "web" ? "Pilih Foto dari Galeri" : "Ambil Foto Toko"}
+            </Text>
+            <Text style={styles.photoSubText}>
+              Foto diperlukan sebelum check-in
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        {photoError && !photoUri && (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorText}>
+              ⚠  Foto toko wajib diambil sebelum melanjutkan check-in.
+            </Text>
+          </View>
+        )}
       </View>
 
       {/* Offline notice */}
@@ -199,12 +237,21 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
       )}
 
       <TouchableOpacity
-        style={[styles.checkinButton, loading && styles.disabled]}
+        style={[styles.checkinButton, !canCheckin && styles.checkinButtonDisabled]}
         onPress={handleCheckin}
         disabled={loading}
         testID="btn-checkin"
       >
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.checkinText}>CHECK-IN</Text>}
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <>
+            <Text style={styles.checkinText}>CHECK-IN</Text>
+            {!canCheckin && (
+              <Text style={styles.checkinSubText}>Ambil foto terlebih dahulu</Text>
+            )}
+          </>
+        )}
       </TouchableOpacity>
     </ScrollView>
   );
@@ -217,17 +264,40 @@ const styles = StyleSheet.create({
   storeAddress: { fontSize: 14, color: "#64748B", marginTop: 4 },
   storeGrade: { fontSize: 13, color: "#2563EB", marginTop: 4 },
   section: { backgroundColor: "#fff", borderRadius: 12, padding: 16, marginBottom: 12 },
+  sectionError: { borderWidth: 1.5, borderColor: "#EF4444" },
   sectionTitle: { fontSize: 14, fontWeight: "600", color: "#475569", marginBottom: 10 },
+  photoHeader: { flexDirection: "row", alignItems: "center", marginBottom: 10, gap: 8 },
+  requiredBadge: { backgroundColor: "#FEE2E2", borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
+  requiredText: { fontSize: 10, fontWeight: "700", color: "#DC2626", letterSpacing: 0.5 },
+  photoButton: {
+    backgroundColor: "#EFF6FF", borderRadius: 10, padding: 20,
+    alignItems: "center", borderWidth: 1.5, borderColor: "#BFDBFE",
+    borderStyle: "dashed",
+  },
+  photoButtonError: { borderColor: "#EF4444", backgroundColor: "#FEF2F2" },
+  cameraIcon: { fontSize: 36, marginBottom: 8 },
+  photoButtonText: { color: "#2563EB", fontWeight: "600", fontSize: 15 },
+  photoSubText: { color: "#94A3B8", fontSize: 12, marginTop: 4 },
+  photoPreview: { width: "100%", height: 200, borderRadius: 10, marginBottom: 10 },
+  photoButtonRetake: {
+    backgroundColor: "#F1F5F9", borderRadius: 8, padding: 10,
+    alignItems: "center", borderWidth: 1, borderColor: "#CBD5E1",
+  },
+  photoButtonRetakeText: { color: "#475569", fontWeight: "600", fontSize: 14 },
+  errorBanner: { backgroundColor: "#FEF2F2", borderRadius: 8, padding: 10, marginTop: 10 },
+  errorText: { color: "#DC2626", fontSize: 13, fontWeight: "500" },
   gpsRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   gpsText: { color: "#475569", fontSize: 14 },
   gpsSuccess: { color: "#16A34A", fontSize: 14, fontWeight: "500" },
   gpsWarn: { color: "#D97706", fontSize: 13 },
   gpsNote: { fontSize: 12, color: "#94A3B8", marginTop: 6 },
-  photoButton: { backgroundColor: "#EFF6FF", borderRadius: 8, padding: 14, alignItems: "center", borderWidth: 1, borderColor: "#BFDBFE" },
-  photoButtonText: { color: "#2563EB", fontWeight: "600" },
   offlineBanner: { backgroundColor: "#FEF3C7", borderRadius: 8, padding: 12, marginBottom: 12 },
   offlineText: { color: "#92400E", fontSize: 13 },
-  checkinButton: { backgroundColor: "#16A34A", borderRadius: 12, padding: 16, alignItems: "center", marginTop: 8 },
-  disabled: { opacity: 0.6 },
+  checkinButton: {
+    backgroundColor: "#16A34A", borderRadius: 12, padding: 16,
+    alignItems: "center", marginTop: 8,
+  },
+  checkinButtonDisabled: { backgroundColor: "#94A3B8" },
   checkinText: { color: "#fff", fontSize: 17, fontWeight: "700", letterSpacing: 1 },
+  checkinSubText: { color: "rgba(255,255,255,0.8)", fontSize: 11, marginTop: 2 },
 });
