@@ -27,23 +27,27 @@ interface Props {
 }
 
 export default function VisitCheckoutScreen({ route, navigation }: Props) {
-  const { visitId, localId, store, totalDemand, effectiveCall, isOffline, items } =
+  const { visitId, localId, store, effectiveCall, isOffline, items } =
     route.params;
   const [submitting, setSubmitting] = useState(false);
 
-  // Aggregate demand items by brand for the summary table
+  // Aggregate demand items by brand — qty only, no monetary calculation
   const brandSummary = useMemo(() => {
     if (!items || items.length === 0) return [];
-    const map: Record<string, { skuCount: number; totalQty: number; demand: number }> = {};
+    const map: Record<string, { skuCount: number; totalQty: number }> = {};
     for (const item of items) {
       const brand = item.brand ?? "Lainnya";
-      if (!map[brand]) map[brand] = { skuCount: 0, totalQty: 0, demand: 0 };
+      if (!map[brand]) map[brand] = { skuCount: 0, totalQty: 0 };
       map[brand].skuCount += 1;
       map[brand].totalQty += item.qty;
-      map[brand].demand += item.qty * (item.stp ?? 0);
     }
     return Object.entries(map).map(([brand, v]) => ({ brand, ...v }));
   }, [items]);
+
+  const totalQty = useMemo(
+    () => (items ?? []).reduce((sum, item) => sum + item.qty, 0),
+    [items],
+  );
 
   const handleSubmit = async () => {
     if (!visitId) {
@@ -76,8 +80,12 @@ export default function VisitCheckoutScreen({ route, navigation }: Props) {
         <Text style={styles.storeName}>{store.store_name}</Text>
 
         <View style={styles.row}>
-          <Text style={styles.label}>Total Demand</Text>
-          <Text style={styles.value}>Rp {totalDemand.toLocaleString("id-ID")}</Text>
+          <Text style={styles.label}>Total SKU</Text>
+          <Text style={styles.value}>{items?.length ?? 0} produk</Text>
+        </View>
+        <View style={styles.row}>
+          <Text style={styles.label}>Total Qty</Text>
+          <Text style={styles.value}>{totalQty} pcs</Text>
         </View>
         <View style={styles.row}>
           <Text style={styles.label}>Efektif Call</Text>
@@ -97,17 +105,13 @@ export default function VisitCheckoutScreen({ route, navigation }: Props) {
       {brandSummary.length > 0 && (
         <View style={styles.brandCard}>
           <Text style={styles.brandCardTitle}>Demand per Brand</Text>
-          {brandSummary.map(({ brand, skuCount, totalQty, demand }) => (
+          {brandSummary.map(({ brand, skuCount, totalQty: brandQty }) => (
             <View key={brand} style={styles.brandRow}>
               <View>
                 <Text style={styles.brandName}>{brand}</Text>
-                <Text style={styles.brandSub}>
-                  {skuCount} SKU · {totalQty} pcs
-                </Text>
+                <Text style={styles.brandSub}>{skuCount} SKU</Text>
               </View>
-              <Text style={styles.brandDemand}>
-                Rp {demand.toLocaleString("id-ID")}
-              </Text>
+              <Text style={styles.brandQty}>{brandQty} pcs</Text>
             </View>
           ))}
         </View>
@@ -183,7 +187,7 @@ const styles = StyleSheet.create({
   },
   brandName: { fontSize: 14, fontWeight: "600", color: "#1E293B" },
   brandSub: { fontSize: 12, color: "#64748B", marginTop: 2 },
-  brandDemand: { fontSize: 14, fontWeight: "600", color: "#2563EB" },
+  brandQty: { fontSize: 14, fontWeight: "600", color: "#2563EB" },
 
   offlineBanner: {
     backgroundColor: "#FEF3C7",

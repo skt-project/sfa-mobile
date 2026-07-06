@@ -90,18 +90,24 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
   const [activeTab, setActiveTab] = useState(ALL_TAB);
   const [search, setSearch] = useState("");
 
-  const { data: skuData, isLoading: skuLoading } = useQuery<Sku[]>({
-    queryKey: ["skus"],
+  const {
+    data: skuData,
+    isLoading: skuLoading,
+    isError: skuError,
+    refetch: refetchSkus,
+  } = useQuery<Sku[]>({
+    queryKey: ["products"],
     queryFn: async () => {
       const online = await isOnline();
       if (online) {
-        const r = await getApiClient().get("/sku", { params: { page_size: 500 } });
+        const r = await getApiClient().get("/product");
         await cacheSkus(r.data.items);
         return r.data.items;
       }
       return getCachedSkus() as unknown as Sku[];
     },
     staleTime: 5 * 60 * 1000,
+    retry: 1,
   });
 
   // Unique brands in order of first appearance
@@ -134,7 +140,23 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
     return base;
   }, [skuData, activeTab, search]);
 
-  // Running totals derived from qtyMap + full sku list (not just visible tab)
+  // SKUs with qty > 0 — drives effectiveCall and checkout button
+  const filledCount = useMemo(
+    () => Object.values(qtyMap).filter((q) => q > 0).length,
+    [qtyMap],
+  );
+
+  // Total pcs across all filled SKUs (qty-based, no Rp)
+  const totalQty = useMemo(
+    () => Object.values(qtyMap).reduce((sum, q) => sum + q, 0),
+    [qtyMap],
+  );
+
+  // Effective Call is qty-based: any product with qty > 0 makes the call effective
+  const effectiveCall: EffectiveCall = filledCount > 0 ? "YES" : "NO";
+
+  // totalDemand (Rp) is still calculated and sent to backend for STEP Web reporting,
+  // but is never displayed in the mobile UI.
   const totalDemand = useMemo(
     () =>
       (skuData ?? []).reduce(
@@ -143,13 +165,6 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
       ),
     [skuData, qtyMap],
   );
-
-  const filledCount = useMemo(
-    () => Object.values(qtyMap).filter((q) => q > 0).length,
-    [qtyMap],
-  );
-
-  const effectiveCall: EffectiveCall = totalDemand > 0 ? "YES" : "NO";
 
   // Stable updater — functional form avoids stale closure over qtyMap
   const setQty = useCallback((skuId: string, qty: number) => {
@@ -225,19 +240,17 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
             {store.store_name}
           </Text>
           <Text style={styles.headerSub}>
-            {filledCount > 0 ? `${filledCount} SKU diisi` : "Belum ada demand"}
+            {filledCount > 0
+              ? `${filledCount} SKU · ${totalQty} pcs`
+              : "Belum ada demand"}
           </Text>
         </View>
-        <View style={styles.headerRight}>
-          <Text style={styles.demandLabel}>Total Demand</Text>
-          <Text style={styles.demandValue}>
-            Rp {totalDemand.toLocaleString("id-ID")}
+        <View
+          style={[styles.ecBadge, effectiveCall === "YES" ? styles.ecYes : styles.ecNo]}
+        >
+          <Text style={styles.ecText}>
+            {effectiveCall === "YES" ? "✓ Efektif" : "✗ Tidak Efektif"}
           </Text>
-          <View style={[styles.ecBadge, effectiveCall === "YES" ? styles.ecYes : styles.ecNo]}>
-            <Text style={styles.ecText}>
-              {effectiveCall === "YES" ? "✓ Efektif" : "✗ Tidak Efektif"}
-            </Text>
-          </View>
         </View>
       </View>
 
@@ -295,6 +308,15 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
               <ActivityIndicator size="large" color="#2563EB" />
               <Text style={styles.loadingText}>Memuat daftar produk...</Text>
             </View>
+          ) : skuError ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>
+                Gagal memuat produk. Periksa koneksi internet.
+              </Text>
+              <TouchableOpacity style={styles.retryBtn} onPress={() => refetchSkus()}>
+                <Text style={styles.retryBtnText}>Coba Lagi</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             <View style={styles.infoBox}>
               <Text style={styles.infoText}>
@@ -305,7 +327,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
           )
         }
         ListEmptyComponent={
-          !skuLoading ? (
+          !skuLoading && !skuError ? (
             <Text style={styles.emptyText}>
               {search ? "Tidak ada produk yang cocok." : "Tidak ada produk."}
             </Text>
@@ -342,7 +364,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
               <Text style={styles.checkoutBtnText}>LANJUT CHECK-OUT</Text>
               <Text style={styles.checkoutBtnSub}>
                 {filledCount > 0
-                  ? `${filledCount} SKU · Rp ${totalDemand.toLocaleString("id-ID")}`
+                  ? `${filledCount} SKU · ${totalQty} pcs`
                   : "Lanjut tanpa demand (tidak efektif)"}
               </Text>
             </>
@@ -361,15 +383,12 @@ const styles = StyleSheet.create({
     padding: 14,
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
   },
   headerLeft: { flex: 1, marginRight: 12 },
   headerStore: { fontSize: 15, fontWeight: "700", color: "#fff" },
   headerSub: { fontSize: 12, color: "#BFDBFE", marginTop: 2 },
-  headerRight: { alignItems: "flex-end" },
-  demandLabel: { fontSize: 11, color: "#BFDBFE" },
-  demandValue: { fontSize: 18, fontWeight: "700", color: "#fff", marginTop: 2 },
-  ecBadge: { borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3, marginTop: 4 },
+  ecBadge: { borderRadius: 4, paddingHorizontal: 8, paddingVertical: 3 },
   ecYes: { backgroundColor: "#16A34A" },
   ecNo: { backgroundColor: "#64748B" },
   ecText: { fontSize: 12, fontWeight: "600", color: "#fff" },
@@ -411,6 +430,16 @@ const styles = StyleSheet.create({
 
   loadingBox: { padding: 40, alignItems: "center", gap: 12 },
   loadingText: { color: "#64748B", fontSize: 14 },
+
+  errorBox: { padding: 32, alignItems: "center", gap: 12 },
+  errorText: { color: "#DC2626", fontSize: 14, textAlign: "center", lineHeight: 20 },
+  retryBtn: {
+    backgroundColor: "#2563EB",
+    borderRadius: 8,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+  },
+  retryBtnText: { color: "#fff", fontWeight: "600", fontSize: 14 },
 
   infoBox: {
     backgroundColor: "#EFF6FF",
