@@ -20,7 +20,7 @@ interface Props {
 export default function VisitCheckinScreen({ route, navigation }: Props) {
   const { store } = route.params;
   const user = useAuthStore((s) => s.user);
-  const { isOffline, addLocalCheckin } = useOfflineStore();
+  const { isOffline, addLocalCheckin, addOnlineTrackingCheckin } = useOfflineStore();
   const [loading, setLoading] = useState(false);
   const [coords, setCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
@@ -84,7 +84,7 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
     setLoading(true);
     const now = new Date().toISOString();
     const today = format(new Date(), "yyyy-MM-dd");
-    const salesmanSk = user?.user_id ?? "";
+    const salesmanSk = user?.salesman_sk ?? "";
 
     try {
       const online = await isOnline();
@@ -109,11 +109,31 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
           );
         }
 
+        // Create a local tracking record so RouteListScreen can display
+        // per-stage status (checked-in / checked-out / submitted) for
+        // online visits. sync_status="synced" prevents the sync engine
+        // from trying to re-upload it.
+        const tracking = await addOnlineTrackingCheckin({
+          server_visit_id: resp.visit_id,
+          salesman_sk: salesmanSk,
+          outlet_sk: store.outlet_sk ?? "",
+          outlet_name: store.store_name,
+          schedule_id: store.route_plan_sk,
+          visit_date: today,
+          visit_type: "ROUTE",
+          checkin_time: now,
+          checkin_lat: coords?.lat,
+          checkin_lon: coords?.lon,
+          checkin_photo_path: photoUri,
+          total_demand: 0,
+          effective_call: "NO",
+        });
+
         navigation.navigate("VisitSurvey", {
           visitId: resp.visit_id,
           store,
           isOffline: false,
-          localId: null,
+          localId: tracking.local_id,
         });
       } else {
         const local = await addLocalCheckin({
