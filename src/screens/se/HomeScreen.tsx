@@ -1,8 +1,9 @@
 import React, { useCallback, useState } from "react";
 import {
   View, Text, StyleSheet, ScrollView, RefreshControl,
-  TouchableOpacity, ActivityIndicator, Alert,
+  TouchableOpacity, Alert,
 } from "react-native";
+import Ionicons from "react-native-vector-icons/Ionicons";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
@@ -10,26 +11,77 @@ import { useAuthStore } from "../../store/authStore";
 import { useOfflineStore } from "../../store/offlineStore";
 import { getKpi } from "../../api/dashboard";
 import { flushPendingVisits, isOnline } from "../../sync/engine";
+import { Card, Badge } from "../../components/shared";
+import { Colors, Spacing, Radius, Shadow, Typography } from "../../theme";
 import type { KpiData } from "../../types";
 
 interface Props {
   navigation: any;
 }
 
-export default function SEHomeScreen({ navigation }: Props) {
-  const user = useAuthStore((s) => s.user);
-  const logout = useAuthStore((s) => s.logout);
-  const { isSyncing, pendingSyncCount, setSyncing, setPendingCount } = useOfflineStore();
-  const [refreshing, setRefreshing] = useState(false);
-  const today = format(new Date(), "yyyy-MM-dd");
-  const todayLabel = format(new Date(), "EEEE, d MMM yyyy", { locale: idLocale });
+interface KpiCardProps {
+  label: string;
+  value: string | number;
+  unit?: string;
+  color?: string;
+}
 
+function KpiTile({ label, value, unit, color = Colors.primary }: KpiCardProps) {
+  return (
+    <View style={[styles.kpiTile, { borderLeftColor: color }]}>
+      <Text style={[styles.kpiValue, { color }]}>
+        {value}{unit}
+      </Text>
+      <Text style={styles.kpiLabel}>{label}</Text>
+    </View>
+  );
+}
+
+interface ActionBtnProps {
+  icon: string;
+  label: string;
+  onPress: () => void;
+  variant?: "primary" | "secondary";
+}
+
+function ActionBtn({ icon, label, onPress, variant = "primary" }: ActionBtnProps) {
+  const isPrimary = variant === "primary";
+  return (
+    <TouchableOpacity
+      style={[styles.actionBtn, isPrimary ? styles.actionBtnPrimary : styles.actionBtnSecondary]}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      <View style={[styles.actionIcon, { backgroundColor: isPrimary ? "rgba(255,255,255,0.2)" : Colors.primaryBg }]}>
+        <Ionicons name={icon} size={20} color={isPrimary ? Colors.white : Colors.primary} />
+      </View>
+      <Text style={[styles.actionLabel, { color: isPrimary ? Colors.white : Colors.primary }]}>
+        {label}
+      </Text>
+      <Ionicons
+        name="chevron-forward"
+        size={16}
+        color={isPrimary ? "rgba(255,255,255,0.6)" : Colors.slate400}
+        style={styles.actionChevron}
+      />
+    </TouchableOpacity>
+  );
+}
+
+export default function SEHomeScreen({ navigation }: Props) {
+  const user    = useAuthStore((s) => s.user);
+  const logout  = useAuthStore((s) => s.logout);
+  const { isSyncing, pendingSyncCount, setSyncing } = useOfflineStore();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const today      = format(new Date(), "yyyy-MM-dd");
+  const todayLabel = format(new Date(), "EEEE, d MMM yyyy", { locale: idLocale });
   const salesmanSk = user?.salesman_sk ?? "";
 
   const { data: kpi, refetch: refetchKpi } = useQuery<KpiData>({
     queryKey: ["kpi", salesmanSk, today],
-    queryFn: () => getKpi(salesmanSk, today),
-    enabled: !!salesmanSk,
+    queryFn:  () => getKpi(salesmanSk, today),
+    enabled:  !!salesmanSk,
     staleTime: 60_000,
   });
 
@@ -40,12 +92,8 @@ export default function SEHomeScreen({ navigation }: Props) {
       const online = await isOnline();
       if (online) {
         const { synced, failed } = await flushPendingVisits();
-        if (synced > 0) {
-          Alert.alert("Sinkronisasi", `${synced} kunjungan berhasil dikirim.`);
-        }
-        if (failed > 0) {
-          Alert.alert("Peringatan", `${failed} kunjungan gagal dikirim. Coba lagi.`);
-        }
+        if (synced > 0)  Alert.alert("Sinkronisasi", `${synced} kunjungan berhasil dikirim.`);
+        if (failed > 0)  Alert.alert("Peringatan",    `${failed} kunjungan gagal dikirim. Coba lagi.`);
       }
       await refetchKpi();
     } finally {
@@ -54,137 +102,213 @@ export default function SEHomeScreen({ navigation }: Props) {
     }
   }, [refetchKpi, setSyncing]);
 
-  const KpiCard = ({ label, value, unit }: { label: string; value: string | number; unit?: string }) => (
-    <View style={styles.kpiCard}>
-      <Text style={styles.kpiValue}>{value}{unit}</Text>
-      <Text style={styles.kpiLabel}>{label}</Text>
-    </View>
-  );
+  const routePct = kpi?.route_completion_pct ?? 0;
 
   return (
     <ScrollView
       style={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />}
       testID="home-scroll"
     >
-      {/* Header */}
+      {/* ── Header ── */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Halo, {user?.username} 👋</Text>
-          <Text style={styles.dateText}>{todayLabel}</Text>
+        <View style={styles.headerTop}>
+          <View>
+            <Text style={styles.greeting}>Halo, {user?.username}</Text>
+            <Text style={styles.dateText}>{todayLabel}</Text>
+          </View>
+          <View style={styles.headerActions}>
+            {pendingSyncCount > 0 && (
+              <Badge label={`${pendingSyncCount} pending`} variant="yellow" />
+            )}
+            <TouchableOpacity
+              style={styles.logoutBtn}
+              onPress={() =>
+                Alert.alert("Keluar", "Yakin ingin keluar?", [
+                  { text: "Batal", style: "cancel" },
+                  { text: "Keluar", style: "destructive", onPress: logout },
+                ])
+              }
+              testID="btn-logout"
+            >
+              <Ionicons name="log-out-outline" size={20} color="rgba(255,255,255,0.8)" />
+            </TouchableOpacity>
+          </View>
         </View>
-        <View style={styles.headerRight}>
-          {pendingSyncCount > 0 && (
-            <View style={styles.syncBadge}>
-              <Text style={styles.syncBadgeText}>{pendingSyncCount} pending</Text>
-            </View>
-          )}
-          <TouchableOpacity
-            style={styles.logoutBtn}
-            onPress={() =>
-              Alert.alert("Keluar", "Yakin ingin keluar?", [
-                { text: "Batal", style: "cancel" },
-                { text: "Keluar", style: "destructive", onPress: logout },
-              ])
-            }
-            testID="btn-logout"
-          >
-            <Text style={styles.logoutText}>Keluar</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
 
-      {/* KPI Summary */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Rangkuman Hari Ini</Text>
-        <View style={styles.kpiGrid}>
-          <KpiCard label="Kunjungan" value={kpi?.total_visits ?? 0} />
-          <KpiCard label="Efektif" value={kpi?.effective_calls ?? 0} />
-          <KpiCard label="Strike Rate" value={kpi?.strike_rate ?? 0} unit="%" />
-          <KpiCard
-            label="Total Demand"
-            value={kpi?.total_demand != null
-              ? `${(kpi.total_demand / 1_000_000).toFixed(1)}M`
-              : "0"}
-          />
-        </View>
-        {(kpi?.route_completion_pct ?? 0) > 0 && (
-          <View style={styles.routeBar}>
-            <Text style={styles.routeBarLabel}>
-              Rute: {kpi?.route_completion_pct ?? 0}%
-            </Text>
-            <View style={styles.progressBg}>
-              <View
-                style={[styles.progressFill, { width: `${Math.min(kpi?.route_completion_pct ?? 0, 100)}%` }]}
-              />
-            </View>
+        {/* Inline route progress in header */}
+        {routePct > 0 && (
+          <View style={styles.routeRow}>
+            <Text style={styles.routeLabel}>Rute hari ini</Text>
+            <Text style={styles.routePct}>{routePct}%</Text>
+          </View>
+        )}
+        {routePct > 0 && (
+          <View style={styles.progressBg}>
+            <View style={[styles.progressFill, { width: `${Math.min(routePct, 100)}%` }]} />
           </View>
         )}
       </View>
 
-      {/* Quick Actions */}
+      {/* ── KPI Grid ── */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Aksi Cepat</Text>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => navigation.navigate("RouteList")}
-          testID="btn-route"
-        >
-          <Text style={styles.actionButtonText}>📋  Lihat Rute Hari Ini</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.actionButtonSecondary]}
-          onPress={() => navigation.navigate("VisitHistory")}
-          testID="btn-history"
-        >
-          <Text style={[styles.actionButtonText, { color: "#1E40AF" }]}>📊  Riwayat Kunjungan</Text>
-        </TouchableOpacity>
+        <Text style={styles.sectionTitle}>Rangkuman Hari Ini</Text>
+        <View style={styles.kpiGrid}>
+          <KpiTile label="Kunjungan"   value={kpi?.total_visits ?? 0}   color={Colors.primary} />
+          <KpiTile label="Efektif"     value={kpi?.effective_calls ?? 0} color={Colors.success} />
+          <KpiTile label="Strike Rate" value={kpi?.strike_rate ?? 0}    color={Colors.warning} unit="%" />
+          <KpiTile
+            label="Total Demand"
+            value={kpi?.total_demand != null
+              ? `${(kpi.total_demand / 1_000_000).toFixed(1)}M`
+              : "0"}
+            color={Colors.primaryDark}
+          />
+        </View>
       </View>
 
-      {/* Pending Approvals Alert */}
+      {/* ── Quick Actions ── */}
+      <View style={[styles.section, { gap: Spacing.sm }]}>
+        <Text style={styles.sectionTitle}>Aksi Cepat</Text>
+        <ActionBtn
+          icon="map-outline"
+          label="Lihat Rute Hari Ini"
+          onPress={() => navigation.navigate("RouteList")}
+          variant="primary"
+        />
+        <ActionBtn
+          icon="time-outline"
+          label="Riwayat Kunjungan"
+          onPress={() => navigation.navigate("VisitHistory")}
+          variant="secondary"
+        />
+      </View>
+
+      {/* ── Alert banners ── */}
       {(kpi?.pending_approvals ?? 0) > 0 && (
-        <View style={styles.alertCard}>
-          <Text style={styles.alertText}>
-            ⏳  {kpi?.pending_approvals} kunjungan menunggu persetujuan
+        <View style={[styles.alertBanner, styles.alertInfo]}>
+          <Ionicons name="time-outline" size={18} color={Colors.primary} />
+          <Text style={[styles.alertText, { color: Colors.primaryDark }]}>
+            {kpi?.pending_approvals} kunjungan menunggu persetujuan
           </Text>
         </View>
       )}
 
       {(kpi?.revision_count ?? 0) > 0 && (
-        <View style={[styles.alertCard, styles.alertWarning]}>
-          <Text style={styles.alertText}>
-            ✏️  {kpi?.revision_count} kunjungan perlu direvisi
+        <View style={[styles.alertBanner, styles.alertWarning]}>
+          <Ionicons name="create-outline" size={18} color={Colors.warning} />
+          <Text style={[styles.alertText, { color: "#92400E" }]}>
+            {kpi?.revision_count} kunjungan perlu direvisi
           </Text>
         </View>
       )}
+
+      <View style={{ height: Spacing["2xl"] }} />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F1F5F9" },
-  header: { backgroundColor: "#2563EB", padding: 20, paddingTop: 28, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  headerRight: { alignItems: "flex-end", gap: 6 },
-  logoutBtn: { backgroundColor: "rgba(255,255,255,0.2)", borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
-  logoutText: { color: "#fff", fontSize: 13, fontWeight: "600" },
-  greeting: { fontSize: 18, fontWeight: "700", color: "#fff" },
-  dateText: { fontSize: 13, color: "#BFDBFE", marginTop: 2 },
-  syncBadge: { backgroundColor: "#FCD34D", borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
-  syncBadgeText: { fontSize: 12, color: "#92400E", fontWeight: "600" },
-  section: { backgroundColor: "#fff", margin: 12, borderRadius: 12, padding: 16, elevation: 2 },
-  sectionTitle: { fontSize: 15, fontWeight: "600", color: "#1E293B", marginBottom: 12 },
-  kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  kpiCard: { flex: 1, minWidth: "45%", backgroundColor: "#EFF6FF", borderRadius: 10, padding: 12, alignItems: "center" },
-  kpiValue: { fontSize: 22, fontWeight: "700", color: "#1D4ED8" },
-  kpiLabel: { fontSize: 12, color: "#64748B", marginTop: 2 },
-  routeBar: { marginTop: 12 },
-  routeBarLabel: { fontSize: 13, color: "#475569", marginBottom: 6 },
-  progressBg: { height: 6, backgroundColor: "#E2E8F0", borderRadius: 3 },
-  progressFill: { height: 6, backgroundColor: "#2563EB", borderRadius: 3 },
-  actionButton: { backgroundColor: "#2563EB", borderRadius: 10, padding: 14, marginBottom: 10, alignItems: "center" },
-  actionButtonSecondary: { backgroundColor: "#EFF6FF", borderWidth: 1, borderColor: "#BFDBFE" },
-  actionButtonText: { fontSize: 15, color: "#fff", fontWeight: "600" },
-  alertCard: { backgroundColor: "#FEF3C7", margin: 12, borderRadius: 10, padding: 14 },
-  alertWarning: { backgroundColor: "#FEE2E2" },
-  alertText: { fontSize: 14, color: "#92400E" },
+  container: { flex: 1, backgroundColor: Colors.background },
+
+  // Header
+  header: {
+    backgroundColor: Colors.primary,
+    padding: Spacing.xl,
+    paddingTop: Spacing["2xl"],
+    paddingBottom: Spacing.xl,
+  },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: Spacing.lg,
+  },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: Spacing.sm },
+  greeting: { fontSize: Typography.xl, fontWeight: Typography.bold, color: Colors.white },
+  dateText: { fontSize: Typography.sm, color: "rgba(255,255,255,0.7)", marginTop: 3 },
+  logoutBtn: {
+    width: 36, height: 36,
+    borderRadius: Radius.md,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  routeRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+  },
+  routeLabel: { fontSize: Typography.sm, color: "rgba(255,255,255,0.8)" },
+  routePct:   { fontSize: Typography.sm, fontWeight: Typography.bold, color: Colors.white },
+  progressBg: { height: 5, backgroundColor: "rgba(255,255,255,0.25)", borderRadius: Radius.full },
+  progressFill: {
+    height: 5,
+    backgroundColor: Colors.white,
+    borderRadius: Radius.full,
+  },
+
+  // Section
+  section: {
+    margin: Spacing.lg,
+    marginBottom: 0,
+    backgroundColor: Colors.white,
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    ...Shadow.sm,
+  },
+  sectionTitle: {
+    fontSize: Typography.base,
+    fontWeight: Typography.semibold,
+    color: Colors.slate800,
+    marginBottom: Spacing.md,
+  },
+
+  // KPI tiles
+  kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: Spacing.sm },
+  kpiTile: {
+    flex: 1,
+    minWidth: "45%",
+    backgroundColor: Colors.slate50,
+    borderRadius: Radius.md,
+    borderLeftWidth: 3,
+    padding: Spacing.md,
+  },
+  kpiValue: { fontSize: Typography["2xl"], fontWeight: Typography.bold },
+  kpiLabel: { fontSize: Typography.xs, color: Colors.slate500, marginTop: 2 },
+
+  // Action buttons
+  actionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    gap: Spacing.md,
+  },
+  actionBtnPrimary:   { backgroundColor: Colors.primary },
+  actionBtnSecondary: {
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.primaryBorder,
+  },
+  actionIcon: { width: 36, height: 36, borderRadius: Radius.sm, alignItems: "center", justifyContent: "center" },
+  actionLabel: { flex: 1, fontSize: Typography.base, fontWeight: Typography.semibold },
+  actionChevron: { marginLeft: "auto" },
+
+  // Alert banners
+  alertBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    margin: Spacing.lg,
+    marginBottom: 0,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    borderWidth: 1,
+  },
+  alertInfo:    { backgroundColor: Colors.infoBg,    borderColor: Colors.primaryBorder },
+  alertWarning: { backgroundColor: Colors.warningBg, borderColor: "#FDE68A" },
+  alertText:    { flex: 1, fontSize: Typography.sm, fontWeight: Typography.medium },
 });
