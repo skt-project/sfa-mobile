@@ -10,10 +10,13 @@ import {
   FlatList,
   ScrollView,
 } from "react-native";
+import Ionicons from "react-native-vector-icons/Ionicons";
 import { useQuery } from "@tanstack/react-query";
+import { Colors, Spacing, Radius, Shadow, Typography } from "../../theme";
 import { getApiClient } from "../../api/client";
 import { useOfflineStore } from "../../store/offlineStore";
 import { checkout as apiCheckout } from "../../api/visit";
+import { updateLocalVisitSyncStatus } from "../../db/visits";
 import type { Sku, VisitItem, ScheduleStore, EffectiveCall } from "../../types";
 import { getCachedSkus, cacheSkus } from "../../db/schedule_cache";
 
@@ -46,9 +49,16 @@ const SkuCard = React.memo(function SkuCard({
       <View style={styles.skuInfo}>
         <Text style={styles.skuCode}>{item.sku_id}</Text>
         <Text style={styles.skuName}>{item.sku_name}</Text>
-        {item.category ? (
-          <Text style={styles.skuCat}>{item.category}</Text>
-        ) : null}
+        <View style={styles.skuMeta}>
+          {item.category ? (
+            <Text style={styles.skuCat}>{item.category}</Text>
+          ) : null}
+          {item.stp != null && item.stp > 0 ? (
+            <Text style={styles.skuPrice}>
+              Rp {item.stp.toLocaleString("id-ID")}
+            </Text>
+          ) : null}
+        </View>
       </View>
       <View style={styles.qtyBlock}>
         <TouchableOpacity
@@ -202,37 +212,64 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
         qty: qtyMap[s.sku_id],
       }));
 
+    const localPayload = {
+      checkout_time: now,
+      total_demand: totalDemand,
+      effective_call: effectiveCall,
+      notes,
+      items_json: JSON.stringify(filledItems),
+    };
+
+    // isOffline tracks whether THIS checkout was ultimately saved online or locally.
+    // Starts as the mode from checkin; may flip to true if network drops mid-visit.
+    let fellOffline = offlineMode;
+
     try {
       if (visitId && !offlineMode) {
-        await apiCheckout(visitId, {
-          total_demand: totalDemand,
-          effective_call: effectiveCall,
-          notes,
-          items: filledItems,
-          offline_mode: false,
-          captured_at: now,
-        });
+        try {
+          await apiCheckout(visitId, {
+            total_demand: totalDemand,
+            effective_call: effectiveCall,
+            notes,
+            items: filledItems,
+            offline_mode: false,
+            captured_at: now,
+          });
+          // Mirror into local DB so RouteListScreen shows "Checkout" status.
+          if (localId) await updateLocalCheckout(localId, localPayload);
+        } catch (e: any) {
+          // Network dropped after an online checkin — fall back to SQLite.
+          // Store server_visit_id so the sync engine can skip the checkin step.
+          if (!e.response && localId) {
+            await updateLocalCheckout(localId, localPayload);
+            await updateLocalVisitSyncStatus(localId, "local", visitId);
+            fellOffline = true;
+          } else {
+            throw e; // server-side error (4xx/5xx) — re-throw to show to user
+          }
+        }
       } else if (localId) {
-        await updateLocalCheckout(localId, {
-          checkout_time: now,
-          total_demand: totalDemand,
-          effective_call: effectiveCall,
-          notes,
-          items_json: JSON.stringify(filledItems),
-        });
+        await updateLocalCheckout(localId, localPayload);
       }
 
       navigation.navigate("VisitCheckout", {
-        visitId,
+        visitId: fellOffline ? null : visitId,
         localId,
         store,
         totalDemand,
         effectiveCall,
-        isOffline: offlineMode,
+        isOffline: fellOffline,
         items: filledItems,
       });
     } catch (e: any) {
-      Alert.alert("Gagal", e?.response?.data?.detail ?? "Gagal menyimpan demand.");
+      const detail = e?.response?.data?.detail;
+      const isTimeout = e?.code === "ECONNABORTED" || e?.code === "ERR_NETWORK";
+      Alert.alert(
+        "Gagal",
+        detail ?? (isTimeout
+          ? "Koneksi timeout. Pastikan sinyal stabil lalu coba lagi."
+          : "Gagal menyimpan demand. Coba lagi."),
+      );
     } finally {
       setLoading(false);
     }
@@ -258,9 +295,16 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
             effectiveCall === "YES" ? styles.ecYes : styles.ecNo,
           ]}
         >
-          <Text style={styles.ecText}>
-            {effectiveCall === "YES" ? "✓ Efektif" : "✗ Tidak Efektif"}
-          </Text>
+          <View style={styles.ecContent}>
+            <Ionicons
+              name={effectiveCall === "YES" ? "checkmark-outline" : "close-outline"}
+              size={13}
+              color={Colors.white}
+            />
+            <Text style={styles.ecText}>
+              {effectiveCall === "YES" ? "Efektif" : "Tidak Efektif"}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -276,9 +320,11 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
             <Text style={styles.tabBarToggleLabel} numberOfLines={1}>
               Brand
             </Text>
-            <View style={{ transform: [{ rotate: tabsOpen ? "180deg" : "0deg" }] }}>
-              <Text style={styles.tabBarChevron}>▼</Text>
-            </View>
+            <Ionicons
+              name={tabsOpen ? "chevron-up" : "chevron-down"}
+              size={14}
+              color={Colors.slate400}
+            />
           </TouchableOpacity>
 
           {/* Collapsible tab row — outer View owns the height for layout stability */}
@@ -324,7 +370,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
             onPress={() => setSearch("")}
             style={styles.searchClear}
           >
-            <Text style={styles.searchClearText}>×</Text>
+            <Ionicons name="close-circle" size={20} color={Colors.slate400} />
           </TouchableOpacity>
         )}
       </View>
@@ -416,254 +462,203 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F1F5F9" },
+  container: { flex: 1, backgroundColor: Colors.background },
 
-  // ── Header ──
   header: {
-    backgroundColor: "#1D4ED8",
-    paddingHorizontal: 16,
+    backgroundColor: Colors.primaryDark,
+    paddingHorizontal: Spacing.lg,
     paddingVertical: 14,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     flexShrink: 0,
   },
-  headerLeft: { flex: 1, marginRight: 12 },
-  headerStore: { fontSize: 15, fontWeight: "700", color: "#fff" },
-  headerSub: { fontSize: 12, color: "#BFDBFE", marginTop: 3 },
-  ecBadge: { borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5 },
-  ecYes: { backgroundColor: "#16A34A" },
-  ecNo: { backgroundColor: "#64748B" },
-  ecText: { fontSize: 12, fontWeight: "600", color: "#fff" },
+  headerLeft:  { flex: 1, marginRight: Spacing.md },
+  headerStore: { fontSize: Typography.base, fontWeight: Typography.bold, color: Colors.white },
+  headerSub:   { fontSize: Typography.xs,   color: Colors.primaryBorder, marginTop: 3 },
+  ecBadge:     { borderRadius: Radius.sm, paddingHorizontal: 10, paddingVertical: 5 },
+  ecYes:       { backgroundColor: "#16A34A" },
+  ecNo:        { backgroundColor: Colors.slate500 },
+  ecContent:   { flexDirection: "row", alignItems: "center", gap: 4 },
+  ecText:      { fontSize: Typography.xs, fontWeight: Typography.semibold, color: Colors.white },
 
-  // ── Brand tabs (collapsible) ──
   tabBarWrapper: {
     flexShrink: 0,
-    backgroundColor: "#fff",
+    backgroundColor: Colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: Colors.border,
   },
-  // Toggle row — always visible, shows active brand + chevron
   tabBarToggle: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
+    paddingHorizontal: Spacing.lg,
     height: 36,
-    gap: 8,
+    gap: Spacing.sm,
   },
   tabBarToggleLabel: {
     flex: 1,
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#475569",
+    fontSize: Typography.xs,
+    fontWeight: Typography.bold,
+    color: Colors.slate600,
     textTransform: "uppercase",
     letterSpacing: 0.5,
   },
-  tabBarChevron: { fontSize: 10, color: "#94A3B8" },
-  // Outer View owns height so Yoga measures stably (not the ScrollView directly)
   tabBarScrollOuter: { height: 38 },
-  tabBarScroll: { flex: 1 },
-  tabBarContent: { paddingHorizontal: 12, alignItems: "center" },
-  tab: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,        // reduced from 12
-    borderRadius: 6,
-    marginRight: 4,
-  },
-  tabActive: { backgroundColor: "#EFF6FF" },
-  tabText: { fontSize: 13, color: "#64748B", fontWeight: "500" },
-  tabTextActive: { color: "#2563EB", fontWeight: "700" },
+  tabBarScroll:      { flex: 1 },
+  tabBarContent:     { paddingHorizontal: Spacing.md, alignItems: "center" },
+  tab:               { paddingHorizontal: 14, paddingVertical: 6, borderRadius: Radius.sm, marginRight: 4 },
+  tabActive:         { backgroundColor: Colors.primaryBg },
+  tabText:           { fontSize: Typography.sm, color: Colors.slate500, fontWeight: Typography.medium },
+  tabTextActive:     { color: Colors.primary, fontWeight: Typography.bold },
 
-  // ── Search ──
   searchRow: {
-    backgroundColor: "#fff",
-    paddingHorizontal: 16,
+    backgroundColor: Colors.white,
+    paddingHorizontal: Spacing.lg,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
+    borderBottomColor: Colors.border,
     flexDirection: "row",
     alignItems: "center",
     flexShrink: 0,
   },
   searchInput: {
     flex: 1,
-    backgroundColor: "#F8FAFC",
-    borderRadius: 8,
+    backgroundColor: Colors.inputBg,
+    borderRadius: Radius.sm,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: Colors.border,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    fontSize: 14,
-    color: "#1E293B",
+    fontSize: Typography.sm,
+    color: Colors.slate800,
   },
-  searchClear: { padding: 8, marginLeft: 6 },
-  searchClearText: { fontSize: 22, color: "#94A3B8", lineHeight: 24 },
+  searchClear: { padding: Spacing.sm, marginLeft: Spacing.xs },
 
-  // ── List ──
-  // flex: 1 is required. Without it, Yoga gives FlatList 0 measured height in
-  // the column flex layout. On Android this causes elevated card children
-  // (elevation: 1) to paint above sibling views, creating the
-  // tabs/search-bar overlap. flex: 1 also properly constrains the scroll
-  // viewport so the footer stays fixed at the bottom.
-  list: { flex: 1 },
+  // flex: 1 is required — without it Yoga gives FlatList 0 measured height.
+  // On Android this causes elevated card children (elevation: 1) to paint
+  // above sibling views, creating a tabs/search-bar overlap.
+  list:        { flex: 1 },
   listContent: { paddingBottom: 120 },
 
-  // ── Status states ──
   loadingBox: { padding: 48, alignItems: "center", gap: 14 },
-  loadingText: { color: "#64748B", fontSize: 14 },
-  errorBox: { padding: 36, alignItems: "center", gap: 14 },
-  errorText: {
-    color: "#DC2626",
-    fontSize: 14,
-    textAlign: "center",
-    lineHeight: 22,
-  },
+  loadingText: { color: Colors.slate500, fontSize: Typography.sm },
+  errorBox:    { padding: 36, alignItems: "center", gap: 14 },
+  errorText:   { color: Colors.danger, fontSize: Typography.sm, textAlign: "center", lineHeight: 22 },
   retryBtn: {
-    backgroundColor: "#2563EB",
-    borderRadius: 8,
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.sm,
     paddingHorizontal: 28,
-    paddingVertical: 12,
+    paddingVertical: Spacing.md,
   },
-  retryBtnText: { color: "#fff", fontWeight: "600", fontSize: 14 },
+  retryBtnText: { color: Colors.white, fontWeight: Typography.semibold, fontSize: Typography.sm },
 
-  // ── Info banner ──
   infoBox: {
-    backgroundColor: "#EFF6FF",
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 4,
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: Colors.primaryBg,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xs,
+    borderRadius: Radius.sm,
+    padding: Spacing.md,
     borderLeftWidth: 3,
-    borderLeftColor: "#2563EB",
+    borderLeftColor: Colors.primary,
   },
-  infoText: { fontSize: 12, color: "#1D4ED8", lineHeight: 18 },
+  infoText: { fontSize: Typography.xs, color: Colors.primaryDark, lineHeight: 18 },
 
   emptyText: {
     textAlign: "center",
-    color: "#94A3B8",
+    color: Colors.slate400,
     marginTop: 36,
-    fontSize: 14,
+    fontSize: Typography.sm,
   },
 
-  // ── Product card ──
   skuCard: {
-    backgroundColor: "#fff",
-    marginHorizontal: 16,
+    backgroundColor: Colors.white,
+    marginHorizontal: Spacing.lg,
     marginVertical: 5,
-    borderRadius: 10,
-    padding: 16,
+    borderRadius: Radius.md,
+    padding: Spacing.lg,
     flexDirection: "row",
     alignItems: "center",
-    elevation: 1,
+    ...Shadow.sm,
     borderWidth: 1,
     borderColor: "transparent",
   },
-  skuCardActive: { borderColor: "#BFDBFE", backgroundColor: "#F0F7FF" },
-  skuInfo: { flex: 1, marginRight: 16 },
+  skuCardActive: { borderColor: Colors.primaryBorder, backgroundColor: "#F0F7FF" },
+  skuInfo:       { flex: 1, marginRight: Spacing.lg },
   skuCode: {
-    fontSize: 11,
-    color: "#94A3B8",
+    fontSize: Typography.xs,
+    color: Colors.slate400,
     fontFamily: "monospace",
     marginBottom: 3,
     letterSpacing: 0.3,
   },
-  skuName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1E293B",
-    lineHeight: 22,
-  },
-  skuCat: { fontSize: 12, color: "#64748B", marginTop: 3 },
+  skuName: { fontSize: Typography.sm, fontWeight: Typography.semibold, color: Colors.slate800, lineHeight: 22 },
+  skuMeta: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, marginTop: 3, flexWrap: "wrap" },
+  skuCat:  { fontSize: Typography.xs, color: Colors.slate500 },
+  skuPrice:{ fontSize: Typography.xs, color: Colors.primary, fontWeight: Typography.semibold },
 
-  // ── Qty controls — 44×44 minimum touch target ──
-  qtyBlock: { alignItems: "center", flexDirection: "row" },
-  qtyBtn: {
-    backgroundColor: "#EFF6FF",
-    borderRadius: 8,
-    width: 44,
-    height: 44,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  qtyBtnDisabled: { backgroundColor: "#F1F5F9" },
-  qtyBtnText: {
-    fontSize: 22,
-    color: "#2563EB",
-    fontWeight: "700",
-    lineHeight: 26,
-  },
-  qtyBtnTextDisabled: { color: "#CBD5E1" },
+  // 44×44 minimum touch target
+  qtyBlock:        { alignItems: "center", flexDirection: "row" },
+  qtyBtn:          { backgroundColor: Colors.primaryBg, borderRadius: Radius.sm, width: 44, height: 44, justifyContent: "center", alignItems: "center" },
+  qtyBtnDisabled:  { backgroundColor: Colors.slate100 },
+  qtyBtnText:      { fontSize: 22, color: Colors.primary, fontWeight: Typography.bold, lineHeight: 26 },
+  qtyBtnTextDisabled: { color: Colors.slate300 },
   qtyInput: {
     width: 52,
     height: 44,
     textAlign: "center",
-    // Android's EditText widget adds implicit top/bottom padding (~4-6dp each)
-    // that is independent of React Native's padding style. Setting padding: 0
-    // removes that system padding so the bold 18px text is never clipped.
-    // textAlignVertical: "center" is required to vertically center the value
-    // when the system padding is removed.
+    // Android EditText adds implicit ~4-6dp top/bottom padding. padding: 0
+    // removes it; textAlignVertical: "center" re-centers the value.
     padding: 0,
     textAlignVertical: "center",
     fontSize: 18,
-    fontWeight: "700",
-    color: "#1E293B",
+    fontWeight: Typography.bold,
+    color: Colors.slate800,
     borderBottomWidth: 2,
-    borderBottomColor: "#E2E8F0",
-    marginHorizontal: 6,
+    borderBottomColor: Colors.border,
+    marginHorizontal: Spacing.xs,
   },
-  qtyInputActive: { borderBottomColor: "#2563EB", color: "#1D4ED8" },
+  qtyInputActive: { borderBottomColor: Colors.primary, color: Colors.primaryDark },
 
-  // ── Notes ──
   notesSection: {
-    backgroundColor: "#fff",
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 8,
-    borderRadius: 10,
-    padding: 16,
+    backgroundColor: Colors.white,
+    marginHorizontal: Spacing.lg,
+    marginTop: Spacing.lg,
+    marginBottom: Spacing.sm,
+    borderRadius: Radius.md,
+    padding: Spacing.lg,
   },
   notesLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#475569",
+    fontSize: Typography.sm,
+    fontWeight: Typography.semibold,
+    color: Colors.slate600,
     marginBottom: 10,
   },
   notesInput: {
     borderWidth: 1,
-    borderColor: "#CBD5E1",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 14,
+    borderColor: Colors.slate300,
+    borderRadius: Radius.sm,
+    padding: Spacing.md,
+    fontSize: Typography.sm,
     textAlignVertical: "top",
     minHeight: 80,
-    color: "#1E293B",
+    color: Colors.slate800,
   },
 
-  // ── Footer checkout button ──
   footer: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: "#fff",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    backgroundColor: Colors.white,
     borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
+    borderTopColor: Colors.border,
   },
   checkoutBtn: {
-    backgroundColor: "#2563EB",
-    borderRadius: 12,
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.md,
     paddingVertical: 15,
     alignItems: "center",
   },
-  btnDisabled: { opacity: 0.6 },
-  checkoutBtnText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: 0.5,
-  },
-  checkoutBtnSub: {
-    color: "rgba(255,255,255,0.75)",
-    fontSize: 12,
-    marginTop: 4,
-  },
+  btnDisabled:     { opacity: 0.6 },
+  checkoutBtnText: { color: Colors.white, fontSize: Typography.lg, fontWeight: Typography.bold, letterSpacing: 0.5 },
+  checkoutBtnSub:  { color: "rgba(255,255,255,0.75)", fontSize: Typography.xs, marginTop: 4 },
 });

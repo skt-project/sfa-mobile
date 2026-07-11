@@ -8,36 +8,50 @@ import {
   ActivityIndicator,
   ScrollView,
 } from "react-native";
+import Ionicons from "react-native-vector-icons/Ionicons";
+import { CommonActions } from "@react-navigation/native";
 import { submitVisit } from "../../api/visit";
+import { updateLocalVisitSyncStatus } from "../../db/visits";
+import { useOfflineStore } from "../../store/offlineStore";
+import { Colors, Spacing, Radius, Shadow, Typography } from "../../theme";
 import type { ScheduleStore, EffectiveCall, VisitItem } from "../../types";
 
 interface Props {
   route: {
     params: {
-      visitId: string | null;
-      localId: string | null;
-      store: ScheduleStore;
-      totalDemand: number;
+      visitId:       string | null;
+      localId:       string | null;
+      store:         ScheduleStore;
+      totalDemand:   number;
       effectiveCall: EffectiveCall;
-      isOffline: boolean;
-      items?: VisitItem[];
+      isOffline:     boolean;
+      items?:        VisitItem[];
     };
   };
   navigation: any;
 }
 
 interface BrandSection {
-  brand: string;
+  brand:    string;
   skuCount: number;
   totalQty: number;
   products: VisitItem[];
 }
 
+function goHome(navigation: any) {
+  navigation.dispatch(
+    CommonActions.reset({
+      index: 0,
+      routes: [{ name: "SETabs", state: { routes: [{ name: "SEHome" }], index: 0 } }],
+    }),
+  );
+}
+
 export default function VisitCheckoutScreen({ route, navigation }: Props) {
-  const { visitId, store, effectiveCall, isOffline, items } = route.params;
+  const { visitId, localId, store, totalDemand, effectiveCall, isOffline, items } = route.params;
+  const { markSubmittedToSpv } = useOfflineStore();
   const [submitting, setSubmitting] = useState(false);
 
-  // Group filled items by brand — qty only, no monetary calculations
   const brandSections = useMemo<BrandSection[]>(() => {
     if (!items || items.length === 0) return [];
     const map: Record<string, BrandSection> = {};
@@ -61,20 +75,48 @@ export default function VisitCheckoutScreen({ route, navigation }: Props) {
     if (!visitId) {
       Alert.alert(
         "Tersimpan Offline",
-        "Kunjungan tersimpan. Akan dikirim saat online (pull-to-refresh).",
-        [{ text: "OK", onPress: () => navigation.navigate("SEHome") }],
+        "Kunjungan tersimpan lokal dan akan dikirim ke SPV saat koneksi tersedia.",
+        [{ text: "OK", onPress: () => goHome(navigation) }],
       );
       return;
     }
 
     setSubmitting(true);
     try {
-      await submitVisit(visitId);
-      Alert.alert("Berhasil!", "Kunjungan berhasil disubmit ke SPV.", [
-        { text: "OK", onPress: () => navigation.navigate("SEHome") },
-      ]);
+      await submitVisit(visitId, {
+        total_demand:   totalDemand,
+        effective_call: effectiveCall,
+        items:          items ?? [],
+      });
+      if (localId) {
+        try { await markSubmittedToSpv(localId); } catch { /* non-critical */ }
+      }
+      Alert.alert(
+        "Berhasil!",
+        "Kunjungan berhasil disubmit ke SPV dan sedang menunggu persetujuan.",
+        [{ text: "OK", onPress: () => goHome(navigation) }],
+      );
     } catch (e: any) {
-      Alert.alert("Gagal", e?.response?.data?.detail ?? "Gagal submit. Coba lagi.");
+      const isNetwork =
+        !e.response &&
+        (e?.code === "ECONNABORTED" || e?.code === "ERR_NETWORK" || !e?.code);
+      if (isNetwork && localId) {
+        try { await updateLocalVisitSyncStatus(localId, "local", visitId); } catch { /* non-critical */ }
+        Alert.alert(
+          "Koneksi Terputus",
+          "Data tersimpan lokal. Lakukan pull-to-refresh saat kembali online untuk mengirim ke SPV.",
+          [{ text: "OK", onPress: () => goHome(navigation) }],
+        );
+      } else {
+        const detail    = e?.response?.data?.detail;
+        const isTimeout = e?.code === "ECONNABORTED" || e?.code === "ERR_NETWORK";
+        Alert.alert(
+          "Gagal Submit",
+          detail ?? (isTimeout
+            ? "Koneksi timeout. Pastikan sinyal stabil lalu coba lagi."
+            : "Gagal submit. Coba lagi."),
+        );
+      }
     } finally {
       setSubmitting(false);
     }
@@ -87,34 +129,30 @@ export default function VisitCheckoutScreen({ route, navigation }: Props) {
         <Text style={styles.summaryTitle}>Ringkasan Kunjungan</Text>
         <Text style={styles.storeName}>{store.store_name}</Text>
 
-        <View style={styles.row}>
-          <Text style={styles.label}>Total SKU</Text>
-          <Text style={styles.value}>{totalSkuCount} produk</Text>
-        </View>
-        <View style={styles.row}>
-          <Text style={styles.label}>Total Qty</Text>
-          <Text style={styles.value}>{totalQty} pcs</Text>
-        </View>
+        {[
+          { label: "Total SKU",   value: `${totalSkuCount} produk` },
+          { label: "Total Qty",   value: `${totalQty} pcs` },
+        ].map(({ label, value }) => (
+          <View key={label} style={styles.row}>
+            <Text style={styles.label}>{label}</Text>
+            <Text style={styles.value}>{value}</Text>
+          </View>
+        ))}
+
         <View style={styles.row}>
           <Text style={styles.label}>Efektif Call</Text>
-          <Text
-            style={[
-              styles.value,
-              effectiveCall === "YES" ? styles.yes : styles.no,
-            ]}
-          >
+          <Text style={[styles.value, effectiveCall === "YES" ? styles.yes : styles.no]}>
             {effectiveCall === "YES" ? "YA" : "TIDAK"}
           </Text>
         </View>
+
         <View style={[styles.row, { marginBottom: 0 }]}>
           <Text style={styles.label}>Mode</Text>
-          <Text style={styles.value}>
-            {isOffline ? "Offline (pending sync)" : "Online"}
-          </Text>
+          <Text style={styles.value}>{isOffline ? "Offline (pending sync)" : "Online"}</Text>
         </View>
       </View>
 
-      {/* ── Demand summary — grouped by brand with product detail ── */}
+      {/* ── Demand summary grouped by brand ── */}
       {brandSections.length > 0 && (
         <View style={styles.demandCard}>
           <Text style={styles.demandCardTitle}>Demand Summary</Text>
@@ -124,21 +162,15 @@ export default function VisitCheckoutScreen({ route, navigation }: Props) {
               key={brand}
               style={[styles.brandSection, idx > 0 && styles.brandSectionBorder]}
             >
-              {/* Brand header */}
               <View style={styles.brandHeader}>
                 <Text style={styles.brandName}>{brand}</Text>
                 <View style={styles.brandMeta}>
-                  <Text style={styles.brandMetaText}>
-                    {skuCount} SKU
-                  </Text>
+                  <Text style={styles.brandMetaText}>{skuCount} SKU</Text>
                   <Text style={styles.brandMetaDot}>·</Text>
-                  <Text style={styles.brandMetaText}>
-                    Total Qty: {brandQty} pcs
-                  </Text>
+                  <Text style={styles.brandMetaText}>Total Qty: {brandQty} pcs</Text>
                 </View>
               </View>
 
-              {/* Product list under brand */}
               <View style={styles.productSection}>
                 <Text style={styles.productSectionLabel}>Produk</Text>
                 {products.map((p, pIdx) => (
@@ -167,10 +199,12 @@ export default function VisitCheckoutScreen({ route, navigation }: Props) {
       {/* ── Offline notice ── */}
       {isOffline && (
         <View style={styles.offlineBanner}>
-          <Text style={styles.offlineText}>
-            📵  Data disimpan lokal. Lakukan pull-to-refresh saat kembali
-            online untuk sinkronisasi otomatis.
-          </Text>
+          <View style={styles.offlineRow}>
+            <Ionicons name="cloud-offline-outline" size={16} color="#92400E" />
+            <Text style={styles.offlineText}>
+              Data disimpan lokal. Lakukan pull-to-refresh saat kembali online untuk sinkronisasi otomatis ke SPV.
+            </Text>
+          </View>
         </View>
       )}
 
@@ -182,7 +216,7 @@ export default function VisitCheckoutScreen({ route, navigation }: Props) {
         testID="btn-submit"
       >
         {submitting ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={Colors.white} />
         ) : (
           <Text style={styles.submitText}>
             {isOffline ? "SELESAI" : "SUBMIT KE SPV"}
@@ -190,10 +224,7 @@ export default function VisitCheckoutScreen({ route, navigation }: Props) {
         )}
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.backBtn}
-        onPress={() => navigation.navigate("SEHome")}
-      >
+      <TouchableOpacity style={styles.backBtn} onPress={() => goHome(navigation)}>
         <Text style={styles.backText}>Kembali ke Home</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -201,83 +232,79 @@ export default function VisitCheckoutScreen({ route, navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F1F5F9" },
-  content: { padding: 16, paddingBottom: 32 },
+  container: { flex: 1, backgroundColor: Colors.background },
+  content:   { padding: Spacing.lg, paddingBottom: Spacing["3xl"] },
 
-  // ── Summary card ──
   summaryCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 20,
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    padding: Spacing.xl,
     marginBottom: 14,
-    elevation: 2,
+    ...Shadow.sm,
   },
-  summaryTitle: { fontSize: 13, color: "#64748B", marginBottom: 6 },
+  summaryTitle: { fontSize: Typography.sm,   color: Colors.slate500, marginBottom: Spacing.xs },
   storeName: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#1E293B",
-    marginBottom: 16,
+    fontSize: Typography.lg,
+    fontWeight: Typography.bold,
+    color: Colors.slate800,
+    marginBottom: Spacing.lg,
     lineHeight: 24,
   },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: Spacing.sm,
   },
-  label: { fontSize: 14, color: "#64748B" },
-  value: { fontSize: 14, fontWeight: "600", color: "#1E293B" },
-  yes: { color: "#16A34A" },
-  no: { color: "#DC2626" },
+  label: { fontSize: Typography.sm,   color: Colors.slate500 },
+  value: { fontSize: Typography.sm,   fontWeight: Typography.semibold, color: Colors.slate800 },
+  yes:   { color: "#16A34A" },
+  no:    { color: Colors.danger },
 
-  // ── Demand card ──
   demandCard: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 20,
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    padding: Spacing.xl,
     marginBottom: 14,
-    elevation: 2,
+    ...Shadow.sm,
   },
   demandCardTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#1E293B",
-    marginBottom: 16,
+    fontSize: Typography.base,
+    fontWeight: Typography.bold,
+    color: Colors.slate800,
+    marginBottom: Spacing.lg,
   },
 
-  // ── Brand section ──
-  brandSection: { paddingBottom: 16 },
+  brandSection:       { paddingBottom: Spacing.lg },
   brandSectionBorder: {
     borderTopWidth: 1,
-    borderTopColor: "#E2E8F0",
-    paddingTop: 16,
-    marginTop: 4,
+    borderTopColor: Colors.border,
+    paddingTop: Spacing.lg,
+    marginTop: Spacing.xs,
   },
-  brandHeader: { marginBottom: 10 },
+  brandHeader: { marginBottom: Spacing.sm },
   brandName: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: "#1D4ED8",
-    marginBottom: 4,
+    fontSize: Typography.base,
+    fontWeight: Typography.bold,
+    color: Colors.primaryDark,
+    marginBottom: Spacing.xs,
   },
-  brandMeta: { flexDirection: "row", alignItems: "center", gap: 6 },
-  brandMetaText: { fontSize: 13, color: "#475569", fontWeight: "500" },
-  brandMetaDot: { fontSize: 13, color: "#94A3B8" },
+  brandMeta:     { flexDirection: "row", alignItems: "center", gap: Spacing.sm },
+  brandMetaText: { fontSize: Typography.sm, color: Colors.slate600, fontWeight: Typography.medium },
+  brandMetaDot:  { fontSize: Typography.sm, color: Colors.slate400 },
 
-  // ── Product list under brand ──
   productSection: {
-    backgroundColor: "#F8FAFC",
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: Colors.muted,
+    borderRadius: Radius.sm,
+    padding: Spacing.md,
   },
   productSectionLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#94A3B8",
+    fontSize: Typography.xs,
+    fontWeight: Typography.semibold,
+    color: Colors.slate400,
     letterSpacing: 0.8,
     textTransform: "uppercase",
-    marginBottom: 8,
+    marginBottom: Spacing.sm,
   },
   productRow: {
     flexDirection: "row",
@@ -285,55 +312,51 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 10,
   },
-  productRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#E2E8F0",
-  },
-  productInfo: { flex: 1, marginRight: 12 },
+  productRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.border },
+  productInfo:      { flex: 1, marginRight: Spacing.md },
   productCode: {
-    fontSize: 11,
-    color: "#94A3B8",
+    fontSize: Typography.xs,
+    color: Colors.slate400,
     fontFamily: "monospace",
     marginBottom: 2,
     letterSpacing: 0.3,
   },
   productName: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: "#1E293B",
+    fontSize: Typography.sm,
+    fontWeight: Typography.medium,
+    color: Colors.slate800,
     lineHeight: 19,
   },
   productQtyBadge: {
-    backgroundColor: "#EFF6FF",
-    borderRadius: 6,
+    backgroundColor: Colors.primaryBg,
+    borderRadius: Radius.sm,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   productQtyText: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#2563EB",
+    fontSize: Typography.sm,
+    fontWeight: Typography.bold,
+    color: Colors.primary,
   },
 
-  // ── Offline notice ──
   offlineBanner: {
-    backgroundColor: "#FEF3C7",
-    borderRadius: 10,
+    backgroundColor: Colors.warningBg,
+    borderRadius: Radius.md,
     padding: 14,
     marginBottom: 14,
   },
-  offlineText: { color: "#92400E", fontSize: 13, lineHeight: 20 },
+  offlineRow: { flexDirection: "row", gap: Spacing.sm, alignItems: "flex-start" },
+  offlineText: { color: "#92400E", fontSize: Typography.sm, lineHeight: 20, flex: 1 },
 
-  // ── Buttons ──
   submitBtn: {
-    backgroundColor: "#2563EB",
-    borderRadius: 12,
-    paddingVertical: 16,
+    backgroundColor: Colors.primary,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.lg,
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: Spacing.md,
   },
-  disabled: { opacity: 0.6 },
-  submitText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  backBtn: { alignItems: "center", paddingVertical: 12 },
-  backText: { color: "#64748B", fontSize: 14 },
+  disabled:   { opacity: 0.6 },
+  submitText: { color: Colors.white, fontSize: Typography.lg, fontWeight: Typography.bold },
+  backBtn:    { alignItems: "center", paddingVertical: Spacing.md },
+  backText:   { color: Colors.slate500, fontSize: Typography.sm },
 });
