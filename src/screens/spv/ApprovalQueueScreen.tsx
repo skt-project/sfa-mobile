@@ -512,7 +512,7 @@ const styles = StyleSheet.create({
   demandRow: { flexDirection: "row", justifyContent: "space-between", marginTop: Spacing.sm },
   demand:    { fontSize: Typography.base, fontWeight: Typography.bold, color: Colors.primaryDark },
   ecTag:     { fontSize: Typography.sm,   fontWeight: Typography.semibold },
-  ecYes:     { color: "#16A34A" },
+  ecYes:     { color: Colors.success },
   ecNo:      { color: Colors.danger },
   revisionNote: { fontSize: Typography.xs, color: Colors.danger, marginTop: Spacing.xs },
 
@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: "row", gap: Spacing.sm, marginTop: Spacing.md },
 
   approveBtn: {
-    flex: 1, backgroundColor: "#16A34A", borderRadius: Radius.sm,
+    flex: 1, backgroundColor: Colors.success, borderRadius: Radius.sm,
     padding: Spacing.sm, alignItems: "center",
   },
   approveBtnText: { color: Colors.white, fontWeight: Typography.bold },
@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
   },
   modalRejectText: { color: Colors.white, fontWeight: Typography.bold },
   modalConfirm: {
-    flex: 1, backgroundColor: "#16A34A", borderRadius: Radius.sm,
+    flex: 1, backgroundColor: Colors.success, borderRadius: Radius.sm,
     padding: Spacing.md, alignItems: "center",
   },
   modalConfirmText: { color: Colors.white, fontWeight: Typography.bold },

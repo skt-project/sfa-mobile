@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
 
   statusRow: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, flexShrink: 1 },
   statusText: { color: Colors.slate600, fontSize: Typography.sm },
-  gpsSuccess: { color: "#16A34A", fontSize: Typography.sm, fontWeight: Typography.medium, flexShrink: 1 },
+  gpsSuccess: { color: Colors.success, fontSize: Typography.sm, fontWeight: Typography.medium, flexShrink: 1 },
   gpsWarn:    { color: Colors.warning,  fontSize: Typography.xs, flexShrink: 1 },
   gpsNote:    { fontSize: Typography.xs, color: Colors.slate400, marginTop: Spacing.sm },
 
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
   offlineText: { color: "#92400E", fontSize: Typography.xs, flexShrink: 1 },
 
   checkinButton: {
-    backgroundColor: "#16A34A",
+    backgroundColor: Colors.success,
     borderRadius: Radius.md,
     padding: Spacing.lg,
     alignItems: "center",

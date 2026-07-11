@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   },
   label: { fontSize: Typography.sm,   color: Colors.slate500 },
   value: { fontSize: Typography.sm,   fontWeight: Typography.semibold, color: Colors.slate800 },
-  yes:   { color: "#16A34A" },
+  yes:   { color: Colors.success },
   no:    { color: Colors.danger },
 
   demandCard: {

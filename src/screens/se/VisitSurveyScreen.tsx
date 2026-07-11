@@ -361,7 +361,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
         <TextInput
           style={styles.searchInput}
           placeholder="Cari nama atau kode produk..."
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={Colors.slate400}
           value={search}
           onChangeText={setSearch}
         />
@@ -386,7 +386,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
         ListHeaderComponent={
           skuLoading ? (
             <View style={styles.loadingBox}>
-              <ActivityIndicator size="large" color="#2563EB" />
+              <ActivityIndicator size="large" color={Colors.primary} />
               <Text style={styles.loadingText}>Memuat daftar produk...</Text>
             </View>
           ) : skuError ? (
@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
   headerStore: { fontSize: Typography.base, fontWeight: Typography.bold, color: Colors.white },
   headerSub:   { fontSize: Typography.xs,   color: Colors.primaryBorder, marginTop: 3 },
   ecBadge:     { borderRadius: Radius.sm, paddingHorizontal: 10, paddingVertical: 5 },
-  ecYes:       { backgroundColor: "#16A34A" },
+  ecYes:       { backgroundColor: Colors.success },
   ecNo:        { backgroundColor: Colors.slate500 },
   ecContent:   { flexDirection: "row", alignItems: "center", gap: 4 },
   ecText:      { fontSize: Typography.xs, fontWeight: Typography.semibold, color: Colors.white },
@@ -583,7 +583,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "transparent",
   },
-  skuCardActive: { borderColor: Colors.primaryBorder, backgroundColor: "#F0F7FF" },
+  skuCardActive: { borderColor: Colors.primaryBorder, backgroundColor: Colors.primaryBg },
   skuInfo:       { flex: 1, marginRight: Spacing.lg },
   skuCode: {
     fontSize: Typography.xs,
