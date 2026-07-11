@@ -124,6 +124,7 @@ export default function SPVHomeScreen({ navigation }: Props) {
   const { data: pending, refetch: refetchPending } = useQuery({
     queryKey: ["visits", "pending-spv"],
     queryFn:  () => listVisits({ status: "PENDING_SPV", page_size: 5 }),
+    staleTime: 30_000,
   });
 
   const { data: teamKpi, refetch: refetchTeam } = useQuery({

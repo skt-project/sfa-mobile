@@ -242,6 +242,7 @@ export default function RevisionEditScreen({ route, navigation }: Props) {
                 multiline
                 numberOfLines={3}
                 placeholder="Tambahkan keterangan tambahan..."
+                placeholderTextColor={Colors.slate300}
               />
             </View>
           }

@@ -429,6 +429,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
               multiline
               numberOfLines={3}
               placeholder="Kondisi toko, feedback pelanggan, kendala, dll..."
+              placeholderTextColor={Colors.slate300}
               testID="input-notes"
             />
           </View>

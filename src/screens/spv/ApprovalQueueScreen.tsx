@@ -386,6 +386,7 @@ export default function ApprovalQueueScreen({ navigation }: Props) {
               value={rejectNote}
               onChangeText={setRejectNote}
               placeholder="Alasan penolakan / catatan revisi..."
+              placeholderTextColor={Colors.slate300}
               multiline
               numberOfLines={4}
               testID="input-reject-note"
@@ -422,6 +423,7 @@ export default function ApprovalQueueScreen({ navigation }: Props) {
               value={skipNote}
               onChangeText={setSkipNote}
               placeholder="Catatan (opsional)..."
+              placeholderTextColor={Colors.slate300}
               multiline
               numberOfLines={3}
               testID="input-skip-note"
