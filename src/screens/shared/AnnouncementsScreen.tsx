@@ -3,9 +3,11 @@ import {
   View, Text, StyleSheet, FlatList,
   ActivityIndicator, RefreshControl,
 } from "react-native";
+import Ionicons from "react-native-vector-icons/Ionicons";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
+import { Colors, Spacing, Radius, Shadow, Typography } from "../../theme";
 import { getApiClient } from "../../api/client";
 
 interface Announcement {
@@ -17,14 +19,14 @@ interface Announcement {
   created_at: string;
 }
 
-const TYPE_COLOR: Record<string, string> = {
+const TYPE_BG: Record<string, string> = {
   Campaign:    "#DBEAFE",
   Policy:      "#FEF3C7",
   Meeting:     "#D1FAE5",
   Distributor: "#FCE7F3",
   Training:    "#EDE9FE",
 };
-const TYPE_TEXT_COLOR: Record<string, string> = {
+const TYPE_FG: Record<string, string> = {
   Campaign:    "#1D4ED8",
   Policy:      "#92400E",
   Meeting:     "#065F46",
@@ -40,15 +42,15 @@ async function fetchAnnouncements(): Promise<Announcement[]> {
 export default function AnnouncementsScreen() {
   const { data = [], isLoading, refetch, isRefetching } = useQuery<Announcement[]>({
     queryKey: ["announcements-mobile"],
-    queryFn: fetchAnnouncements,
+    queryFn:  fetchAnnouncements,
     staleTime: 5 * 60_000,
   });
 
   const renderItem = ({ item }: { item: Announcement }) => (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
-        <View style={[styles.typeBadge, { backgroundColor: TYPE_COLOR[item.type] ?? "#F1F5F9" }]}>
-          <Text style={[styles.typeText, { color: TYPE_TEXT_COLOR[item.type] ?? "#475569" }]}>
+        <View style={[styles.typeBadge, { backgroundColor: TYPE_BG[item.type] ?? Colors.background }]}>
+          <Text style={[styles.typeText, { color: TYPE_FG[item.type] ?? Colors.slate600 }]}>
             {item.type}
           </Text>
         </View>
@@ -65,19 +67,17 @@ export default function AnnouncementsScreen() {
   return (
     <View style={styles.container}>
       {isLoading ? (
-        <ActivityIndicator size="large" color="#2563EB" style={{ marginTop: 60 }} />
+        <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 60 }} />
       ) : (
         <FlatList
           data={data}
           keyExtractor={(item) => item.announcement_id}
           renderItem={renderItem}
-          refreshControl={
-            <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
-          }
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} />}
           contentContainerStyle={data.length === 0 ? styles.emptyContainer : styles.listContent}
           ListEmptyComponent={
             <View style={styles.emptyBox}>
-              <Text style={styles.emptyIcon}>📢</Text>
+              <Ionicons name="megaphone-outline" size={48} color={Colors.slate400} />
               <Text style={styles.emptyText}>Belum ada pengumuman</Text>
             </View>
           }
@@ -88,28 +88,24 @@ export default function AnnouncementsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container:      { flex: 1, backgroundColor: "#F1F5F9" },
-  listContent:    { padding: 12 },
+  container:      { flex: 1, backgroundColor: Colors.background },
+  listContent:    { padding: Spacing.md },
   emptyContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  emptyBox:       { alignItems: "center", marginTop: 80 },
-  emptyIcon:      { fontSize: 48, marginBottom: 12 },
-  emptyText:      { fontSize: 15, color: "#94A3B8" },
+  emptyBox:       { alignItems: "center", marginTop: 80, gap: Spacing.md },
+  emptyText:      { fontSize: Typography.base, color: Colors.slate400 },
+
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    padding: Spacing.lg,
     marginBottom: 10,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
+    ...Shadow.sm,
   },
-  cardHeader:  { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
-  typeBadge:   { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  typeText:    { fontSize: 12, fontWeight: "600" },
-  dateText:    { fontSize: 12, color: "#94A3B8" },
-  title:       { fontSize: 15, fontWeight: "700", color: "#1E293B", marginBottom: 6 },
-  body:        { fontSize: 14, color: "#475569", lineHeight: 20 },
-  audience:    { fontSize: 12, color: "#94A3B8", marginTop: 8 },
+  cardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: Spacing.sm },
+  typeBadge:  { borderRadius: Radius.sm, paddingHorizontal: Spacing.sm, paddingVertical: 3 },
+  typeText:   { fontSize: Typography.xs, fontWeight: "600" },
+  dateText:   { fontSize: Typography.xs, color: Colors.slate400 },
+  title:      { fontSize: Typography.base, fontWeight: "700", color: Colors.slate800, marginBottom: 6 },
+  body:       { fontSize: Typography.sm, color: Colors.slate600, lineHeight: 20 },
+  audience:   { fontSize: Typography.xs, color: Colors.slate400, marginTop: Spacing.sm },
 });
