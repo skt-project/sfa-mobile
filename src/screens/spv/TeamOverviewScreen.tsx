@@ -2,8 +2,10 @@ import React from "react";
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl,
 } from "react-native";
+import Ionicons from "react-native-vector-icons/Ionicons";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { Colors, Spacing, Radius, Shadow, Typography } from "../../theme";
 import { getTeamKpi, TeamMemberKpi } from "../../api/dashboard";
 
 interface Props {
@@ -15,7 +17,7 @@ export default function TeamOverviewScreen({ navigation }: Props) {
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["team-kpi", today],
-    queryFn: () => getTeamKpi(today),
+    queryFn:  () => getTeamKpi(today),
     staleTime: 60_000,
   });
 
@@ -47,22 +49,18 @@ export default function TeamOverviewScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      {/* Team summary */}
+      {/* ── Team summary ── */}
       <View style={styles.summaryBar}>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{data?.total_members ?? 0}</Text>
-          <Text style={styles.summaryLabel}>SE Aktif</Text>
-        </View>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>{totalVisits}</Text>
-          <Text style={styles.summaryLabel}>Total Kunjungan</Text>
-        </View>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryValue}>
-            Rp {(totalDemand / 1_000_000).toFixed(1)}M
-          </Text>
-          <Text style={styles.summaryLabel}>Total Demand</Text>
-        </View>
+        {[
+          { value: String(data?.total_members ?? 0), label: "SE Aktif" },
+          { value: String(totalVisits),               label: "Total Kunjungan" },
+          { value: `Rp ${(totalDemand / 1_000_000).toFixed(1)}M`, label: "Total Demand" },
+        ].map((item) => (
+          <View key={item.label} style={styles.summaryItem}>
+            <Text style={styles.summaryValue}>{item.value}</Text>
+            <Text style={styles.summaryLabel}>{item.label}</Text>
+          </View>
+        ))}
       </View>
 
       <FlatList
@@ -70,8 +68,14 @@ export default function TeamOverviewScreen({ navigation }: Props) {
         keyExtractor={(item) => item.salesman_sk}
         renderItem={renderItem}
         refreshControl={<RefreshControl refreshing={isLoading} onRefresh={refetch} />}
+        contentContainerStyle={{ paddingBottom: Spacing.xl }}
         ListEmptyComponent={
-          !isLoading ? <Text style={styles.empty}>Belum ada data hari ini.</Text> : null
+          !isLoading ? (
+            <View style={styles.emptyWrap}>
+              <Ionicons name="people-outline" size={40} color={Colors.slate400} />
+              <Text style={styles.empty}>Belum ada data hari ini.</Text>
+            </View>
+          ) : null
         }
         testID="team-list"
       />
@@ -80,19 +84,53 @@ export default function TeamOverviewScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F1F5F9" },
-  summaryBar: { backgroundColor: "#1D4ED8", flexDirection: "row", padding: 16, justifyContent: "space-around" },
-  summaryItem: { alignItems: "center" },
-  summaryValue: { fontSize: 18, fontWeight: "700", color: "#fff" },
-  summaryLabel: { fontSize: 12, color: "#BFDBFE", marginTop: 2 },
-  memberCard: { backgroundColor: "#fff", marginHorizontal: 12, marginTop: 8, borderRadius: 10, padding: 14, flexDirection: "row", alignItems: "center", elevation: 1 },
-  rank: { width: 32, height: 32, borderRadius: 16, backgroundColor: "#EFF6FF", justifyContent: "center", alignItems: "center", marginRight: 12 },
-  rankText: { fontSize: 14, fontWeight: "700", color: "#1D4ED8" },
+  container: { flex: 1, backgroundColor: Colors.background },
+
+  summaryBar: {
+    backgroundColor: Colors.primaryDark,
+    flexDirection: "row",
+    padding: Spacing.lg,
+    justifyContent: "space-around",
+  },
+  summaryItem:  { alignItems: "center" },
+  summaryValue: { fontSize: Typography.lg,  fontWeight: "700", color: Colors.white },
+  summaryLabel: { fontSize: Typography.xs,  color: Colors.primaryBorder, marginTop: 2 },
+
+  memberCard: {
+    backgroundColor: Colors.card,
+    marginHorizontal: Spacing.md,
+    marginTop: Spacing.sm,
+    borderRadius: Radius.md,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    ...Shadow.sm,
+  },
+  rank: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.full,
+    backgroundColor: Colors.primaryBg,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: Spacing.md,
+  },
+  rankText:   { fontSize: Typography.sm, fontWeight: "700", color: Colors.primaryDark },
   memberInfo: { flex: 1 },
-  memberName: { fontSize: 15, fontWeight: "600", color: "#1E293B" },
-  statsRow: { flexDirection: "row", gap: 12, marginTop: 4 },
-  stat: { fontSize: 12, color: "#64748B" },
-  pendingBadge: { backgroundColor: "#FCD34D", borderRadius: 12, width: 24, height: 24, justifyContent: "center", alignItems: "center" },
+  memberName: { fontSize: Typography.base, fontWeight: "600", color: Colors.slate800 },
+  statsRow:   { flexDirection: "row", gap: Spacing.md, marginTop: Spacing.xs },
+  stat:       { fontSize: Typography.xs, color: Colors.slate500 },
+
+  pendingBadge: {
+    backgroundColor: "#FCD34D",
+    borderRadius: Radius.full,
+    width: 24,
+    height: 24,
+    justifyContent: "center",
+    alignItems: "center",
+  },
   pendingBadgeText: { fontSize: 11, fontWeight: "700", color: "#92400E" },
-  empty: { textAlign: "center", marginTop: 60, color: "#94A3B8", fontSize: 15 },
+
+  emptyWrap: { alignItems: "center", paddingTop: 60, gap: Spacing.md },
+  empty:     { textAlign: "center", color: Colors.slate400, fontSize: Typography.base },
 });
