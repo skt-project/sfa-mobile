@@ -2,8 +2,10 @@ import React from "react";
 import {
   View, Text, StyleSheet, ScrollView, Image,
 } from "react-native";
+import Ionicons from "react-native-vector-icons/Ionicons";
 import { format, parseISO } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
+import { Colors, Spacing, Radius, Shadow, Typography } from "../../theme";
 import type { VisitItem, EffectiveCall } from "../../types";
 
 interface HistoryItem {
@@ -25,9 +27,9 @@ interface Props {
   route: { params: { item: HistoryItem } };
 }
 
-function fmt(iso?: string, fmt = "HH:mm, d MMM yyyy"): string {
+function fmt(iso?: string, fmtStr = "HH:mm, d MMM yyyy"): string {
   if (!iso) return "-";
-  try { return format(parseISO(iso), fmt, { locale: idLocale }); } catch { return "-"; }
+  try { return format(parseISO(iso), fmtStr, { locale: idLocale }); } catch { return "-"; }
 }
 
 function InfoRow({ label, value, valueStyle }: { label: string; value: string; valueStyle?: object }) {
@@ -51,21 +53,26 @@ export default function VisitDetailScreen({ route }: Props) {
   const totalQty = demandItems.reduce((s, it) => s + (it.qty ?? 0), 0);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
+    <ScrollView style={styles.container} contentContainerStyle={{ padding: Spacing.lg, paddingBottom: 40 }}>
 
-      {/* Status banner */}
+      {/* ── Status banner ── */}
       <View style={[styles.statusBanner, isComplete ? styles.bannerComplete : styles.bannerPartial]}>
-        <Text style={styles.bannerText}>
-          {isComplete ? "✓  Kunjungan Selesai" : "⏳  Kunjungan Parsial (belum checkout)"}
+        <Ionicons
+          name={isComplete ? "checkmark-circle-outline" : "time-outline"}
+          size={18}
+          color={isComplete ? Colors.success : "#92400E"}
+        />
+        <Text style={[styles.bannerText, isComplete ? styles.bannerTextComplete : styles.bannerTextPartial]}>
+          {isComplete ? "Kunjungan Selesai" : "Kunjungan Parsial (belum checkout)"}
         </Text>
       </View>
 
-      {/* Store + visit info */}
+      {/* ── Store + visit info ── */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Informasi Kunjungan</Text>
-        <InfoRow label="Toko" value={item.outlet_name} />
-        <InfoRow label="Tanggal" value={fmt(item.visit_date + "T00:00:00", "EEEE, d MMMM yyyy")} />
-        <InfoRow label="Check-In" value={fmt(item.checkin_time)} />
+        <InfoRow label="Toko"      value={item.outlet_name} />
+        <InfoRow label="Tanggal"   value={fmt(item.visit_date + "T00:00:00", "EEEE, d MMMM yyyy")} />
+        <InfoRow label="Check-In"  value={fmt(item.checkin_time)} />
         <InfoRow label="Check-Out" value={fmt(item.checkout_time)} />
         {item.duration_min != null && (
           <InfoRow label="Durasi" value={`${item.duration_min} menit`} />
@@ -85,7 +92,7 @@ export default function VisitDetailScreen({ route }: Props) {
         )}
       </View>
 
-      {/* Check-in photo */}
+      {/* ── Check-in photo ── */}
       {item.checkin_photo_path ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Foto Check-In</Text>
@@ -97,7 +104,7 @@ export default function VisitDetailScreen({ route }: Props) {
         </View>
       ) : null}
 
-      {/* Demand items */}
+      {/* ── Demand items ── */}
       <View style={styles.card}>
         <Text style={styles.cardTitle}>
           Detail Demand
@@ -108,10 +115,9 @@ export default function VisitDetailScreen({ route }: Props) {
           <Text style={styles.emptyItems}>Tidak ada demand yang diinput pada kunjungan ini.</Text>
         ) : (
           <>
-            {/* Table header */}
             <View style={[styles.demandRow, styles.demandHeader]}>
               <Text style={[styles.demandCell, styles.demandCellName, styles.headerText]}>Produk</Text>
-              <Text style={[styles.demandCell, styles.demandCellQty, styles.headerText]}>Qty</Text>
+              <Text style={[styles.demandCell, styles.demandCellQty,  styles.headerText]}>Qty</Text>
               <Text style={[styles.demandCell, styles.demandCellAmount, styles.headerText]}>Total</Text>
             </View>
 
@@ -132,12 +138,9 @@ export default function VisitDetailScreen({ route }: Props) {
               );
             })}
 
-            {/* Total row */}
             <View style={[styles.demandRow, styles.totalRow]}>
-              <Text style={[styles.demandCell, styles.demandCellName, styles.totalLabel]}>
-                TOTAL
-              </Text>
-              <Text style={[styles.demandCell, styles.demandCellQty, styles.totalLabel]}>{totalQty}</Text>
+              <Text style={[styles.demandCell, styles.demandCellName, styles.totalLabel]}>TOTAL</Text>
+              <Text style={[styles.demandCell, styles.demandCellQty,  styles.totalLabel]}>{totalQty}</Text>
               <Text style={[styles.demandCell, styles.demandCellAmount, styles.totalLabel]}>
                 Rp {item.total_demand.toLocaleString("id-ID")}
               </Text>
@@ -150,48 +153,96 @@ export default function VisitDetailScreen({ route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F1F5F9" },
+  container: { flex: 1, backgroundColor: Colors.background },
 
-  statusBanner: { borderRadius: 10, padding: 12, marginBottom: 12, alignItems: "center" },
-  bannerComplete: { backgroundColor: "#DCFCE7" },
-  bannerPartial: { backgroundColor: "#FEF3C7" },
-  bannerText: { fontSize: 14, fontWeight: "700", color: "#374151" },
+  statusBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  bannerComplete:     { backgroundColor: "#DCFCE7" },
+  bannerPartial:      { backgroundColor: "#FEF3C7" },
+  bannerText:         { fontSize: Typography.sm, fontWeight: "700" },
+  bannerTextComplete: { color: Colors.success },
+  bannerTextPartial:  { color: "#92400E" },
 
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    elevation: 1,
+    backgroundColor: Colors.card,
+    borderRadius: Radius.md,
+    padding: Spacing.lg,
+    marginBottom: Spacing.md,
+    ...Shadow.sm,
   },
-  cardTitle: { fontSize: 14, fontWeight: "700", color: "#475569", marginBottom: 12, textTransform: "uppercase", letterSpacing: 0.5 },
+  cardTitle: {
+    fontSize: Typography.sm,
+    fontWeight: "700",
+    color: Colors.slate600,
+    marginBottom: Spacing.md,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
 
-  infoRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: "#F8FAFC" },
-  infoLabel: { fontSize: 14, color: "#64748B" },
-  infoValue: { fontSize: 14, fontWeight: "600", color: "#1E293B", maxWidth: "60%", textAlign: "right" },
-  colorGreen: { color: "#16A34A" },
-  colorRed: { color: "#DC2626" },
-  colorBlue: { color: "#1D4ED8" },
+  infoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 7,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.muted,
+  },
+  infoLabel: { fontSize: Typography.sm, color: Colors.slate500 },
+  infoValue: {
+    fontSize: Typography.sm,
+    fontWeight: "600",
+    color: Colors.slate800,
+    maxWidth: "60%",
+    textAlign: "right",
+  },
+  colorGreen: { color: Colors.success },
+  colorRed:   { color: Colors.danger },
+  colorBlue:  { color: Colors.primaryDark },
 
-  photo: { width: "100%", height: 200, borderRadius: 8 },
+  photo: { width: "100%", height: 200, borderRadius: Radius.sm },
 
-  emptyItems: { color: "#94A3B8", fontSize: 14, textAlign: "center", paddingVertical: 16 },
+  emptyItems: {
+    color: Colors.slate400,
+    fontSize: Typography.sm,
+    textAlign: "center",
+    paddingVertical: Spacing.lg,
+  },
 
-  demandRow: { flexDirection: "row", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" },
-  demandRowAlt: { backgroundColor: "#FAFBFF" },
-  demandHeader: { borderBottomWidth: 2, borderBottomColor: "#E2E8F0", marginBottom: 2 },
-  totalRow: { borderTopWidth: 2, borderTopColor: "#E2E8F0", borderBottomWidth: 0, backgroundColor: "#EFF6FF" },
+  demandRow: {
+    flexDirection: "row",
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.background,
+  },
+  demandRowAlt:   { backgroundColor: "#FAFBFF" },
+  demandHeader:   { borderBottomWidth: 2, borderBottomColor: Colors.border, marginBottom: 2 },
+  totalRow:       {
+    borderTopWidth: 2,
+    borderTopColor: Colors.border,
+    borderBottomWidth: 0,
+    backgroundColor: Colors.primaryBg,
+  },
 
-  demandCell: { paddingHorizontal: 4 },
-  demandCellName: { flex: 3 },
-  demandCellQty: { flex: 1, alignItems: "center", textAlign: "center" },
+  demandCell:       { paddingHorizontal: 4 },
+  demandCellName:   { flex: 3 },
+  demandCellQty:    { flex: 1, alignItems: "center", textAlign: "center" },
   demandCellAmount: { flex: 2, textAlign: "right" },
 
-  headerText: { fontSize: 12, fontWeight: "700", color: "#475569", textTransform: "uppercase" },
-  demandSkuCode: { fontSize: 10, color: "#94A3B8", fontFamily: "monospace" },
-  demandSkuName: { fontSize: 13, color: "#1E293B", fontWeight: "500" },
-  demandSkuCat: { fontSize: 11, color: "#64748B" },
-  qtyText: { fontSize: 14, fontWeight: "700", color: "#1E293B", textAlign: "center" },
-  amountText: { fontSize: 13, color: "#374151", textAlign: "right" },
-  totalLabel: { fontSize: 13, fontWeight: "700", color: "#1D4ED8" },
+  headerText: {
+    fontSize: Typography.xs,
+    fontWeight: "700",
+    color: Colors.slate600,
+    textTransform: "uppercase",
+  },
+  demandSkuCode: { fontSize: Typography.xs, color: Colors.slate400, fontFamily: "monospace" },
+  demandSkuName: { fontSize: Typography.sm, color: Colors.slate800, fontWeight: "500" },
+  demandSkuCat:  { fontSize: Typography.xs, color: Colors.slate500 },
+  qtyText:       { fontSize: Typography.sm, fontWeight: "700", color: Colors.slate800, textAlign: "center" },
+  amountText:    { fontSize: Typography.sm, color: Colors.slate700, textAlign: "right" },
+  totalLabel:    { fontSize: Typography.sm, fontWeight: "700", color: Colors.primaryDark },
 });
