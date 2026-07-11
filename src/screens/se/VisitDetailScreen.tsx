@@ -21,6 +21,8 @@ interface HistoryItem {
   source: "local" | "server";
   server_visit_id?: string;
   checkin_photo_path?: string;
+  approval_status?: string;
+  rejection_notes?: string;
 }
 
 interface Props {

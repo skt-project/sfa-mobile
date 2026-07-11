@@ -124,6 +124,7 @@ export default function RevisionEditScreen({ route, navigation }: Props) {
     queryKey: ["visit-detail", visitId],
     queryFn:  () => getVisitDetail(visitId),
     enabled:  !!visitId && !!skuData,
+    staleTime: 60_000,
   });
 
   useEffect(() => {
