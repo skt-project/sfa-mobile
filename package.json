@@ -39,12 +39,14 @@
     "detox": "^20.51.4",
     "jest": "^29.7.0",
     "jest-expo": "^57.0.1",
+    "patch-package": "^8.0.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "postinstall": "patch-package || true && node scripts/patch-cmake.js",
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "test": "jest",
     "test:e2e:build": "detox build -c android.emu.debug",

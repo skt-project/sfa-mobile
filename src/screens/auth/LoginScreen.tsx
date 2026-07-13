@@ -45,7 +45,7 @@ export default function LoginScreen() {
         {/* Brand */}
         <View style={styles.brand}>
           <View style={styles.brandIcon}>
-            <Ionicons name="map" size={28} color={Colors.white} />
+            <Ionicons name="map" size={28} color={Colors.white} accessible={false} />
           </View>
           <Text style={styles.brandName}>STEP</Text>
           <Text style={styles.brandSub}>Territory &amp; Execution Platform</Text>
@@ -59,7 +59,7 @@ export default function LoginScreen() {
           <View style={styles.field}>
             <Text style={styles.label}>USERNAME</Text>
             <View style={styles.inputWrap}>
-              <Ionicons name="person-outline" size={16} color={Colors.slate400} style={styles.inputIcon} />
+              <Ionicons name="person-outline" size={16} color={Colors.slate400} style={styles.inputIcon} accessible={false} />
               <TextInput
                 style={styles.input}
                 placeholder="Masukkan username"
@@ -71,6 +71,7 @@ export default function LoginScreen() {
                 returnKeyType="next"
                 onSubmitEditing={() => pwRef.current?.focus()}
                 testID="input-username"
+                accessibilityLabel="Username"
               />
             </View>
           </View>
@@ -79,7 +80,7 @@ export default function LoginScreen() {
           <View style={styles.field}>
             <Text style={styles.label}>PASSWORD</Text>
             <View style={styles.inputWrap}>
-              <Ionicons name="lock-closed-outline" size={16} color={Colors.slate400} style={styles.inputIcon} />
+              <Ionicons name="lock-closed-outline" size={16} color={Colors.slate400} style={styles.inputIcon} accessible={false} />
               <TextInput
                 ref={pwRef}
                 style={[styles.input, { flex: 1 }]}
@@ -91,12 +92,14 @@ export default function LoginScreen() {
                 returnKeyType="go"
                 onSubmitEditing={handleLogin}
                 testID="input-password"
+                accessibilityLabel="Password"
               />
-              <TouchableOpacity onPress={() => setShowPw((v) => !v)} style={styles.eyeBtn}>
+              <TouchableOpacity onPress={() => setShowPw((v) => !v)} style={styles.eyeBtn} accessibilityLabel={showPw ? "Sembunyikan password" : "Tampilkan password"} accessibilityRole="button">
                 <Ionicons
                   name={showPw ? "eye-off-outline" : "eye-outline"}
                   size={18}
                   color={Colors.slate400}
+                  accessible={false}
                 />
               </TouchableOpacity>
             </View>
@@ -109,13 +112,15 @@ export default function LoginScreen() {
             disabled={loading}
             activeOpacity={0.8}
             testID="btn-login"
+            accessibilityLabel={loading ? "Sedang memproses..." : "Masuk"}
+            accessibilityRole="button"
           >
             {loading ? (
               <ActivityIndicator color={Colors.white} />
             ) : (
               <View style={styles.buttonContent}>
                 <Text style={styles.buttonText}>Masuk</Text>
-                <Ionicons name="arrow-forward" size={18} color={Colors.white} />
+                <Ionicons name="arrow-forward" size={18} color={Colors.white} accessible={false} />
               </View>
             )}
           </TouchableOpacity>

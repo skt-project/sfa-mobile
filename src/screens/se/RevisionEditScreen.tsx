@@ -69,6 +69,8 @@ const SkuCard = React.memo(function SkuCard({
           onPress={() => onSetQty(item.sku_id, qty - 1)}
           disabled={qty === 0}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel={`Kurangi qty ${item.sku_name}`}
+          accessibilityRole="button"
         >
           <Text style={[styles.qtyBtnText, qty === 0 && styles.qtyBtnTextDisabled]}>−</Text>
         </TouchableOpacity>
@@ -78,11 +80,14 @@ const SkuCard = React.memo(function SkuCard({
           onChangeText={(v) => onSetQty(item.sku_id, parseInt(v) || 0)}
           keyboardType="number-pad"
           selectTextOnFocus
+          accessibilityLabel={`Jumlah ${item.sku_name}`}
         />
         <TouchableOpacity
           style={styles.qtyBtn}
           onPress={() => onSetQty(item.sku_id, qty + 1)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel={`Tambah qty ${item.sku_name}`}
+          accessibilityRole="button"
         >
           <Text style={styles.qtyBtnText}>+</Text>
         </TouchableOpacity>
@@ -221,7 +226,7 @@ export default function RevisionEditScreen({ route, navigation }: Props) {
       ) : skuError ? (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>Gagal memuat produk. Periksa koneksi internet.</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={() => refetchSkus()}>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => refetchSkus()} accessibilityLabel="Coba lagi memuat produk" accessibilityRole="button">
             <Text style={styles.retryBtnText}>Coba Lagi</Text>
           </TouchableOpacity>
         </View>
@@ -244,6 +249,7 @@ export default function RevisionEditScreen({ route, navigation }: Props) {
                 numberOfLines={3}
                 placeholder="Tambahkan keterangan tambahan..."
                 placeholderTextColor={Colors.slate300}
+                accessibilityLabel="Catatan tambahan (opsional)"
               />
             </View>
           }
@@ -258,6 +264,8 @@ export default function RevisionEditScreen({ route, navigation }: Props) {
             onPress={handleResubmit}
             disabled={submitting}
             testID="btn-resubmit"
+            accessibilityLabel={submitting ? "Sedang memproses..." : filledCount > 0 ? `Submit ulang ke SPV, ${filledCount} SKU, ${totalQty} pcs` : "Submit ulang ke SPV tanpa demand"}
+            accessibilityRole="button"
           >
             {submitting ? (
               <ActivityIndicator color={Colors.white} />

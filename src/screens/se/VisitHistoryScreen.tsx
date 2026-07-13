@@ -62,7 +62,7 @@ function localToHistoryItem(v: LocalVisit): HistoryItem {
 function serverToHistoryItem(v: Visit): HistoryItem {
   return {
     id: v.visit_id,
-    outlet_name: (v as any).store_name ?? v.outlet_sk ?? "Toko",
+    outlet_name: v.store_name ?? v.outlet_sk ?? "Toko",
     visit_date: v.visit_date,
     checkin_time: v.checkin_time,
     checkout_time: v.checkout_time,
@@ -185,6 +185,8 @@ export default function VisitHistoryScreen({ navigation }: Props) {
         onPress={() => handleItemPress(item)}
         testID={`history-${item.id}`}
         activeOpacity={0.7}
+        accessibilityLabel={`${item.outlet_name}, ${formatDate(item.visit_date)}${isRevision ? ", perlu revisi" : ""}`}
+        accessibilityRole="button"
       >
         <View style={styles.cardHeader}>
           <Text style={styles.storeName} numberOfLines={1}>{item.outlet_name}</Text>
@@ -208,18 +210,18 @@ export default function VisitHistoryScreen({ navigation }: Props) {
 
         <View style={styles.cardMeta}>
           <View style={styles.metaItem}>
-            <Ionicons name="time-outline" size={13} color={Colors.slate500} />
+            <Ionicons name="time-outline" size={13} color={Colors.slate500} accessible={false} />
             <Text style={styles.metaText}>{formatTime(item.checkin_time)}</Text>
           </View>
           {item.checkout_time && (
             <View style={styles.metaItem}>
-              <Ionicons name="arrow-forward" size={13} color={Colors.slate400} />
+              <Ionicons name="arrow-forward" size={13} color={Colors.slate400} accessible={false} />
               <Text style={styles.metaText}>{formatTime(item.checkout_time)}</Text>
             </View>
           )}
           {item.duration_min != null && (
             <View style={styles.metaItem}>
-              <Ionicons name="timer-outline" size={13} color={Colors.slate500} />
+              <Ionicons name="timer-outline" size={13} color={Colors.slate500} accessible={false} />
               <Text style={styles.metaText}>{item.duration_min} mnt</Text>
             </View>
           )}
@@ -231,6 +233,7 @@ export default function VisitHistoryScreen({ navigation }: Props) {
               name={item.effective_call === "YES" ? "checkmark-outline" : "close-outline"}
               size={12}
               color={item.effective_call === "YES" ? Colors.success : Colors.danger}
+              accessible={false}
             />
             <Text style={[
               styles.ecTagText,
@@ -248,7 +251,7 @@ export default function VisitHistoryScreen({ navigation }: Props) {
           {isRevision && (
             <View style={styles.revisionAction}>
               <Text style={styles.revisionActionText}>Revisi</Text>
-              <Ionicons name="chevron-forward" size={14} color={Colors.danger} />
+              <Ionicons name="chevron-forward" size={14} color={Colors.danger} accessible={false} />
             </View>
           )}
         </View>
@@ -272,6 +275,9 @@ export default function VisitHistoryScreen({ navigation }: Props) {
         <TouchableOpacity
           style={[styles.tabBtn, tab === "all" && styles.tabBtnActive]}
           onPress={() => setTab("all")}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: tab === "all" }}
+          accessibilityLabel={`Semua, ${allItems.length} kunjungan`}
         >
           <Text style={[styles.tabBtnText, tab === "all" && styles.tabBtnTextActive]}>
             Semua ({allItems.length})
@@ -280,11 +286,14 @@ export default function VisitHistoryScreen({ navigation }: Props) {
         <TouchableOpacity
           style={[styles.tabBtn, tab === "revision" && styles.tabBtnActive]}
           onPress={() => setTab("revision")}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: tab === "revision" }}
+          accessibilityLabel={revisionCount > 0 ? `Perlu Revisi, ${revisionCount} item` : "Perlu Revisi"}
         >
           <Text style={[styles.tabBtnText, tab === "revision" && styles.tabBtnTextActive]}>
             Perlu Revisi {revisionCount > 0 ? `(${revisionCount})` : ""}
           </Text>
-          {revisionCount > 0 && <View style={styles.revisionDot} />}
+          {revisionCount > 0 && <View style={styles.revisionDot} aria-hidden />}
         </TouchableOpacity>
       </View>
 
@@ -300,6 +309,7 @@ export default function VisitHistoryScreen({ navigation }: Props) {
               name={tab === "revision" ? "checkmark-circle-outline" : "clipboard-outline"}
               size={48}
               color={tab === "revision" ? Colors.success : Colors.slate400}
+              accessible={false}
             />
             <Text style={styles.emptyTitle}>
               {tab === "revision" ? "Tidak Ada Revisi" : "Belum Ada Kunjungan"}

@@ -40,11 +40,9 @@ export default function Header({ title, subtitle, rightElement, variant = "prima
   );
 }
 
-const PT = Platform.OS === "android" ? StatusBar.currentHeight ?? 0 : 0;
-
 const styles = StyleSheet.create({
   container: {
-    paddingTop: PT + Spacing.lg,
+    paddingTop: (Platform.OS === "android" ? StatusBar.currentHeight ?? 0 : 0) + Spacing.lg,
     paddingBottom: Spacing.lg,
     paddingHorizontal: Spacing.xl,
   },

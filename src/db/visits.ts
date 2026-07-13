@@ -2,7 +2,10 @@ import { getDb } from "./schema";
 import type { LocalVisit } from "../types";
 import { randomUUID } from "expo-crypto";
 
-export async function insertLocalVisit(v: Omit<LocalVisit, "local_id" | "sync_status">): Promise<LocalVisit> {
+export async function insertLocalVisit(
+  v: Omit<LocalVisit, "local_id" | "sync_status">,
+  syncStatus: LocalVisit["sync_status"] = "local",
+): Promise<LocalVisit> {
   const db = await getDb();
   const local_id = `LOCAL-${randomUUID()}`;
   await db.runAsync(
@@ -10,17 +13,17 @@ export async function insertLocalVisit(v: Omit<LocalVisit, "local_id" | "sync_st
        local_id, server_visit_id, salesman_sk, outlet_sk, outlet_name, schedule_id,
        visit_date, visit_type, checkin_time, checkin_lat, checkin_lon, checkin_photo_path,
        total_demand, effective_call, notes, items_json, sync_status, created_at
-     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'local',?)`,
+     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [
       local_id, v.server_visit_id ?? null, v.salesman_sk, v.outlet_sk ?? null,
       v.outlet_name ?? null, v.schedule_id ?? null, v.visit_date, v.visit_type,
       v.checkin_time ?? null, v.checkin_lat ?? null, v.checkin_lon ?? null,
       v.checkin_photo_path ?? null,
       v.total_demand, v.effective_call, v.notes ?? null,
-      v.items_json ?? null, new Date().toISOString(),
+      v.items_json ?? null, syncStatus, new Date().toISOString(),
     ],
   );
-  return { ...v, local_id, sync_status: "local" };
+  return { ...v, local_id, sync_status: syncStatus };
 }
 
 export async function updateLocalVisitCheckout(
@@ -86,6 +89,17 @@ export async function getLocalVisitById(localId: string): Promise<LocalVisit | n
     [localId],
   ) as LocalVisit | null;
   return row;
+}
+
+export async function updateLocalVisitSubmittedAt(
+  localId: string,
+  submittedAt: string,
+): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(
+    "UPDATE local_visits SET submitted_at=? WHERE local_id=?",
+    [submittedAt, localId],
+  );
 }
 
 /** Seed realistic demo visits for the demo account if none exist yet. */

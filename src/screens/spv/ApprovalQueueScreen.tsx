@@ -30,8 +30,26 @@ function VisitCard({
   return (
     <TouchableOpacity
       style={styles.card}
-      onPress={() => navigation.navigate("VisitDetailSPV", { visitId: item.visit_id })}
+      onPress={() => navigation.navigate("VisitDetail", {
+        item: {
+          id: item.visit_id,
+          outlet_name: item.store_name ?? item.outlet_sk ?? item.visit_id,
+          visit_date: item.visit_date,
+          checkin_time: item.checkin_time,
+          checkout_time: item.checkout_time,
+          total_demand: item.total_demand ?? 0,
+          effective_call: item.effective_call ?? "NO",
+          duration_min: item.duration_minutes,
+          items_json: item.items ? JSON.stringify(item.items) : undefined,
+          source: "server" as const,
+          server_visit_id: item.visit_id,
+          approval_status: item.approval_status,
+          rejection_notes: item.rejection_notes,
+        },
+      })}
       testID={`approval-${item.visit_id}`}
+      accessibilityLabel={`${item.store_name ?? item.outlet_sk ?? item.visit_id}, ${item.salesman_name ?? item.salesman_sk}, ${item.visit_date}`}
+      accessibilityRole="button"
     >
       <View style={styles.cardHeader}>
         <Text style={styles.cardId}>{item.visit_id}</Text>
@@ -41,10 +59,10 @@ function VisitCard({
       </View>
 
       <Text style={styles.outletName}>
-        {(item as any).store_name ?? item.outlet_sk ?? "—"}
+        {item.store_name ?? item.outlet_sk ?? "—"}
       </Text>
       <Text style={styles.meta}>
-        {(item as any).salesman_name ?? item.salesman_sk} · {item.visit_date}
+        {item.salesman_name ?? item.salesman_sk} · {item.visit_date}
       </Text>
 
       <View style={styles.demandRow}>
@@ -66,12 +84,14 @@ function VisitCard({
           onPress={() => onApprove(item.visit_id)}
           disabled={isLoading}
           testID={`btn-approve-${item.visit_id}`}
+          accessibilityLabel={`Setujui kunjungan ${item.store_name ?? item.outlet_sk ?? item.visit_id}`}
+          accessibilityRole="button"
         >
           {isLoading ? (
             <ActivityIndicator size="small" color={Colors.white} />
           ) : (
             <View style={styles.btnContent}>
-              <Ionicons name="checkmark-outline" size={16} color={Colors.white} />
+              <Ionicons name="checkmark-outline" size={16} color={Colors.white} accessible={false} />
               <Text style={styles.approveBtnText}>Setuju</Text>
             </View>
           )}
@@ -82,9 +102,11 @@ function VisitCard({
           onPress={() => onReject(item.visit_id)}
           disabled={isLoading}
           testID={`btn-reject-${item.visit_id}`}
+          accessibilityLabel={`Minta revisi kunjungan ${item.store_name ?? item.outlet_sk ?? item.visit_id}`}
+          accessibilityRole="button"
         >
           <View style={styles.btnContent}>
-            <Ionicons name="close-outline" size={16} color={Colors.danger} />
+            <Ionicons name="close-outline" size={16} color={Colors.danger} accessible={false} />
             <Text style={styles.rejectBtnText}>Revisi</Text>
           </View>
         </TouchableOpacity>
@@ -149,12 +171,14 @@ function SkippedCard({
             onPress={() => onReturn(item.skipped_store_id)}
             disabled={isLoading}
             testID={`btn-return-${item.skipped_store_id}`}
+            accessibilityLabel={`Kembalikan toko ${item.outlet_name ?? item.outlet_sk} ke salesman`}
+            accessibilityRole="button"
           >
             {isLoading ? (
               <ActivityIndicator size="small" color={Colors.primaryDark} />
             ) : (
               <View style={styles.btnContent}>
-                <Ionicons name="return-up-back-outline" size={16} color={Colors.primaryDark} />
+                <Ionicons name="return-up-back-outline" size={16} color={Colors.primaryDark} accessible={false} />
                 <Text style={styles.returnBtnText}>Kembalikan ke SE</Text>
               </View>
             )}
@@ -165,12 +189,14 @@ function SkippedCard({
             onPress={() => onExecute(item.skipped_store_id)}
             disabled={isLoading}
             testID={`btn-execute-${item.skipped_store_id}`}
+            accessibilityLabel={`Laksanakan kunjungan toko ${item.outlet_name ?? item.outlet_sk}`}
+            accessibilityRole="button"
           >
             {isLoading ? (
               <ActivityIndicator size="small" color={Colors.white} />
             ) : (
               <View style={styles.btnContent}>
-                <Ionicons name="play-outline" size={16} color={Colors.white} />
+                <Ionicons name="play-outline" size={16} color={Colors.white} accessible={false} />
                 <Text style={styles.executeBtnText}>Laksanakan</Text>
               </View>
             )}
@@ -186,7 +212,7 @@ function SkippedCard({
 function EmptyQueue({ message }: { message: string }) {
   return (
     <View style={styles.emptyWrap}>
-      <Ionicons name="checkmark-circle-outline" size={48} color={Colors.success} />
+      <Ionicons name="checkmark-circle-outline" size={48} color={Colors.success} accessible={false} />
       <Text style={styles.empty}>{message}</Text>
     </View>
   );
@@ -303,11 +329,14 @@ export default function ApprovalQueueScreen({ navigation }: Props) {
         <TouchableOpacity
           style={[styles.tab, tab === "visits" && styles.tabActive]}
           onPress={() => setTab("visits")}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: tab === "visits" }}
+          accessibilityLabel={pendingVisits > 0 ? `Kunjungan, ${pendingVisits} menunggu` : "Kunjungan"}
         >
           <Text style={[styles.tabText, tab === "visits" && styles.tabTextActive]}>Kunjungan</Text>
           {pendingVisits > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{pendingVisits}</Text>
+            <View style={styles.badge} accessible={false}>
+              <Text style={styles.badgeText} accessible={false}>{pendingVisits}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -315,11 +344,14 @@ export default function ApprovalQueueScreen({ navigation }: Props) {
         <TouchableOpacity
           style={[styles.tab, tab === "skipped" && styles.tabActive]}
           onPress={() => setTab("skipped")}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: tab === "skipped" }}
+          accessibilityLabel={pendingSkipped > 0 ? `Toko Terlewat, ${pendingSkipped} menunggu` : "Toko Terlewat"}
         >
           <Text style={[styles.tabText, tab === "skipped" && styles.tabTextActive]}>Toko Terlewat</Text>
           {pendingSkipped > 0 && (
-            <View style={[styles.badge, { backgroundColor: "#F97316" }]}>
-              <Text style={styles.badgeText}>{pendingSkipped}</Text>
+            <View style={[styles.badge, { backgroundColor: "#F97316" }]} accessible={false}>
+              <Text style={styles.badgeText} accessible={false}>{pendingSkipped}</Text>
             </View>
           )}
         </TouchableOpacity>
@@ -377,7 +409,7 @@ export default function ApprovalQueueScreen({ navigation }: Props) {
       )}
 
       {/* ── Visit reject modal ── */}
-      <Modal visible={rejectModal.visible} transparent animationType="slide">
+      <Modal visible={rejectModal.visible} transparent animationType="slide" accessibilityViewIsModal>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>Catatan Penolakan</Text>
@@ -390,15 +422,23 @@ export default function ApprovalQueueScreen({ navigation }: Props) {
               multiline
               numberOfLines={4}
               testID="input-reject-note"
+              accessibilityLabel="Catatan penolakan"
             />
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.modalCancel}
                 onPress={() => setRejectModal({ visible: false, visitId: null })}
+                accessibilityLabel="Batal"
+                accessibilityRole="button"
               >
                 <Text style={styles.modalCancelText}>Batal</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.modalReject} onPress={handleReject}>
+              <TouchableOpacity
+                style={styles.modalReject}
+                onPress={handleReject}
+                accessibilityLabel="Kembalikan ke SE"
+                accessibilityRole="button"
+              >
                 <Text style={styles.modalRejectText}>Kembalikan ke SE</Text>
               </TouchableOpacity>
             </View>
@@ -407,7 +447,7 @@ export default function ApprovalQueueScreen({ navigation }: Props) {
       </Modal>
 
       {/* ── Skipped store action modal ── */}
-      <Modal visible={skipNoteModal.visible} transparent animationType="slide">
+      <Modal visible={skipNoteModal.visible} transparent animationType="slide" accessibilityViewIsModal>
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>
@@ -427,11 +467,14 @@ export default function ApprovalQueueScreen({ navigation }: Props) {
               multiline
               numberOfLines={3}
               testID="input-skip-note"
+              accessibilityLabel="Catatan SPV (opsional)"
             />
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.modalCancel}
                 onPress={() => setSkipNoteModal({ visible: false, id: null, action: "return" })}
+                accessibilityLabel="Batal"
+                accessibilityRole="button"
               >
                 <Text style={styles.modalCancelText}>Batal</Text>
               </TouchableOpacity>
@@ -441,6 +484,8 @@ export default function ApprovalQueueScreen({ navigation }: Props) {
                   skipNoteModal.action === "execute" && { backgroundColor: Colors.primary },
                 ]}
                 onPress={handleSkipAction}
+                accessibilityLabel={skipNoteModal.action === "return" ? "Kembalikan ke salesman" : "Laksanakan oleh SPV"}
+                accessibilityRole="button"
               >
                 <Text style={styles.modalConfirmText}>
                   {skipNoteModal.action === "return" ? "Kembalikan" : "Laksanakan"}

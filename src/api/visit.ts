@@ -1,6 +1,6 @@
 import { getApiClient } from "./client";
 import type {
-  CheckinResponse, Visit, VisitItem, VisitType, EffectiveCall,
+  CheckinResponse, Visit, VisitItem, VisitType, EffectiveCall, SkippedStore,
 } from "../types";
 
 export interface CheckinPayload {
@@ -34,12 +34,19 @@ export async function checkin(payload: CheckinPayload): Promise<CheckinResponse>
 }
 
 export async function checkout(visitId: string, payload: CheckoutPayload): Promise<Visit> {
-  const r = await getApiClient().post<Visit>(`/visit/${visitId}/checkout`, payload);
+  const r = await getApiClient().post<Visit>(`/visit/${visitId}/checkout`, payload, { timeout: 45000 });
   return r.data;
 }
 
-export async function submitVisit(visitId: string): Promise<Visit> {
-  const r = await getApiClient().post<Visit>(`/visit/${visitId}/submit`, {});
+export interface SubmitPayload {
+  total_demand: number;
+  effective_call: EffectiveCall;
+  items: VisitItem[];
+  offline_mode?: boolean;
+}
+
+export async function submitVisit(visitId: string, payload: SubmitPayload): Promise<Visit> {
+  const r = await getApiClient().post<Visit>(`/visit/${visitId}/submit`, payload, { timeout: 45000 });
   return r.data;
 }
 
@@ -80,5 +87,49 @@ export async function listVisits(params: {
 
 export async function getVisitDetail(visitId: string): Promise<Visit> {
   const r = await getApiClient().get<Visit>(`/visit/${visitId}`);
+  return r.data;
+}
+
+// ── Skipped Stores ────────────────────────────────────────────────────────────
+
+export interface SkippedStoreIn {
+  outlet_sk: string;
+  outlet_name?: string;
+  distributor_code?: string;
+  brand_group?: string;
+  week_iso: string;
+  visit_date: string;
+}
+
+export async function submitSkippedStores(
+  salesman_sk: string,
+  stores: SkippedStoreIn[],
+): Promise<{ created: number; skipped: number }> {
+  const r = await getApiClient().post("/skipped-stores", { salesman_sk, stores });
+  return r.data;
+}
+
+export async function listSkippedStores(params: {
+  week_iso?: string;
+  status?: string;
+  page?: number;
+  page_size?: number;
+}): Promise<{ items: SkippedStore[]; total: number; has_next: boolean }> {
+  const r = await getApiClient().get("/skipped-stores", { params });
+  return r.data;
+}
+
+export async function returnSkippedStore(id: string, notes?: string): Promise<SkippedStore> {
+  const r = await getApiClient().put<SkippedStore>(`/skipped-stores/${id}/return`, { notes });
+  return r.data;
+}
+
+export async function executeSkippedStore(id: string, notes?: string): Promise<SkippedStore> {
+  const r = await getApiClient().put<SkippedStore>(`/skipped-stores/${id}/execute`, { notes });
+  return r.data;
+}
+
+export async function getSkippedStoreSummary(weekIso?: string): Promise<Record<string, number>> {
+  const r = await getApiClient().get("/skipped-stores/summary", { params: { week_iso: weekIso } });
   return r.data;
 }

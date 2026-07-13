@@ -1,6 +1,6 @@
 import React from "react";
 import {
-  View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl,
+  View, Text, StyleSheet, FlatList, RefreshControl,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useQuery } from "@tanstack/react-query";
@@ -30,15 +30,35 @@ export default function TeamOverviewScreen({ navigation }: Props) {
         <Text style={styles.memberName}>{item.salesman_name ?? item.salesman_sk}</Text>
         <View style={styles.statsRow}>
           <Text style={styles.stat}>{item.total_visits} kunjungan</Text>
-          <Text style={styles.stat}>{item.strike_rate}% efektif</Text>
           <Text style={styles.stat}>
             Rp {(item.total_demand / 1_000_000).toFixed(1)}M
           </Text>
         </View>
+        <View style={styles.progressRow}>
+          <View style={styles.progressTrack}>
+            <View style={[
+              styles.progressFill,
+              {
+                width: `${Math.min(item.strike_rate, 100)}%` as any,
+                backgroundColor: item.strike_rate >= 80 ? Colors.success : item.strike_rate >= 60 ? Colors.warning : Colors.danger,
+              },
+            ]} />
+          </View>
+          <Text style={[
+            styles.progressPct,
+            { color: item.strike_rate >= 80 ? Colors.success : item.strike_rate >= 60 ? Colors.warning : Colors.danger },
+          ]}>
+            {item.strike_rate.toFixed(0)}%
+          </Text>
+        </View>
       </View>
       {item.pending_approvals > 0 && (
-        <View style={styles.pendingBadge}>
-          <Text style={styles.pendingBadgeText}>{item.pending_approvals}</Text>
+        <View
+          style={styles.pendingBadge}
+          accessible={true}
+          accessibilityLabel={`${item.pending_approvals} approval menunggu`}
+        >
+          <Text style={styles.pendingBadgeText} accessible={false}>{item.pending_approvals}</Text>
         </View>
       )}
     </View>
@@ -72,7 +92,7 @@ export default function TeamOverviewScreen({ navigation }: Props) {
         ListEmptyComponent={
           !isLoading ? (
             <View style={styles.emptyWrap}>
-              <Ionicons name="people-outline" size={40} color={Colors.slate400} />
+              <Ionicons name="people-outline" size={40} color={Colors.slate400} accessible={false} />
               <Text style={styles.empty}>Belum ada data hari ini.</Text>
             </View>
           ) : null
@@ -120,6 +140,10 @@ const styles = StyleSheet.create({
   memberName: { fontSize: Typography.base, fontWeight: "600", color: Colors.slate800 },
   statsRow:   { flexDirection: "row", gap: Spacing.md, marginTop: Spacing.xs },
   stat:       { fontSize: Typography.xs, color: Colors.slate500 },
+  progressRow: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, marginTop: 6 },
+  progressTrack: { flex: 1, height: 4, borderRadius: Radius.full, backgroundColor: Colors.slate100, overflow: "hidden" },
+  progressFill:  { height: 4, borderRadius: Radius.full },
+  progressPct:   { fontSize: Typography.xs, fontWeight: "700", width: 34, textAlign: "right" },
 
   pendingBadge: {
     backgroundColor: "#FCD34D",

@@ -5,6 +5,12 @@ export const BASE_URL = "https://step-api-141828905128.asia-southeast1.run.app/a
 const TOKEN_KEY = "sfa_jwt";
 
 let _axiosInstance: AxiosInstance | null = null;
+let _onUnauthorized: (() => void) | null = null;
+
+/** Register a callback invoked when the server returns 401 (expired/invalid token). */
+export function setUnauthorizedHandler(handler: () => void): void {
+  _onUnauthorized = handler;
+}
 
 // Web-compatible token storage (SecureStore not available on web)
 async function _getToken(): Promise<string | null> {
@@ -49,6 +55,17 @@ export function getApiClient(): AxiosInstance {
     }
     return config;
   });
+
+  _axiosInstance.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      if (error.response?.status === 401) {
+        await _clearToken();
+        _onUnauthorized?.();
+      }
+      return Promise.reject(error);
+    },
+  );
 
   return _axiosInstance;
 }

@@ -67,7 +67,12 @@ export default function AnnouncementsScreen() {
   return (
     <View style={styles.container}>
       {isLoading ? (
-        <ActivityIndicator size="large" color={Colors.primary} style={{ marginTop: 60 }} />
+        <ActivityIndicator
+          size="large"
+          color={Colors.primary}
+          style={{ marginTop: 60 }}
+          accessibilityLabel="Memuat pengumuman…"
+        />
       ) : (
         <FlatList
           data={data}
@@ -77,7 +82,7 @@ export default function AnnouncementsScreen() {
           contentContainerStyle={data.length === 0 ? styles.emptyContainer : styles.listContent}
           ListEmptyComponent={
             <View style={styles.emptyBox}>
-              <Ionicons name="megaphone-outline" size={48} color={Colors.slate400} />
+              <Ionicons name="megaphone-outline" size={48} color={Colors.slate400} accessible={false} />
               <Text style={styles.emptyText}>Belum ada pengumuman</Text>
             </View>
           }

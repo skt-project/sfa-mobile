@@ -1,10 +1,13 @@
 import React from "react";
+import { View, Text, StyleSheet } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import Ionicons from "react-native-vector-icons/Ionicons";
+import { useQuery } from "@tanstack/react-query";
 
 import { useAuthStore } from "../store/authStore";
+import { getApiClient } from "../api/client";
 import { Colors, TabBar } from "../theme";
 import LoginScreen from "../screens/auth/LoginScreen";
 import SEHomeScreen from "../screens/se/HomeScreen";
@@ -19,6 +22,8 @@ import SPVHomeScreen from "../screens/spv/SPVHomeScreen";
 import ApprovalQueueScreen from "../screens/spv/ApprovalQueueScreen";
 import TeamOverviewScreen from "../screens/spv/TeamOverviewScreen";
 import AnnouncementsScreen from "../screens/shared/AnnouncementsScreen";
+import NotificationsScreen from "../screens/shared/NotificationsScreen";
+import ProfileScreen from "../screens/shared/ProfileScreen";
 
 const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
@@ -27,25 +32,63 @@ function tabIcon(name: string, focused: boolean, color: string) {
   return <Ionicons name={focused ? name : `${name}-outline`} size={22} color={color} />;
 }
 
+function ProfileTabIcon({ focused, color }: { focused: boolean; color: string }) {
+  const { data: count = 0 } = useQuery<number>({
+    queryKey: ["notifications-unread-count"],
+    queryFn:  () =>
+      getApiClient()
+        .get<{ notification_id: string; is_read: boolean }[]>("/notifications")
+        .then((r) => r.data.filter((n) => !n.is_read).length)
+        .catch(() => 0),
+    staleTime: 60_000,
+  });
+  return (
+    <View>
+      <Ionicons name={focused ? "person" : "person-outline"} size={22} color={color} accessible={false} />
+      {count > 0 && (
+        <View style={navBadge.dot} accessibilityLabel={`${count} notifikasi belum dibaca`}>
+          <Text style={navBadge.text} accessible={false}>{count > 9 ? "9+" : count}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+const navBadge = StyleSheet.create({
+  dot: {
+    position: "absolute",
+    right: -6,
+    top: -4,
+    backgroundColor: Colors.danger,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 3,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  text: { fontSize: 9, fontWeight: "700", color: Colors.white },
+});
+
+const SHARED_TAB_OPTIONS = {
+  tabBarActiveTintColor:   TabBar.activeTint,
+  tabBarInactiveTintColor: TabBar.inactiveTint,
+  tabBarStyle: {
+    backgroundColor: TabBar.background,
+    borderTopColor:  TabBar.borderColor,
+    borderTopWidth:  1,
+    paddingBottom:   4,
+    paddingTop:      4,
+    height:          58,
+  },
+  tabBarLabelStyle: { fontSize: 11, fontWeight: "600" as const },
+  headerShown: false,
+} as const;
+
 // ---- SE Tab Navigator ----
 function SETabNavigator() {
   return (
-    <Tab.Navigator
-      screenOptions={{
-        tabBarActiveTintColor:   TabBar.activeTint,
-        tabBarInactiveTintColor: TabBar.inactiveTint,
-        tabBarStyle: {
-          backgroundColor:   TabBar.background,
-          borderTopColor:    TabBar.borderColor,
-          borderTopWidth:    1,
-          paddingBottom:     4,
-          paddingTop:        4,
-          height:            58,
-        },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
-        headerShown: false,
-      }}
-    >
+    <Tab.Navigator screenOptions={SHARED_TAB_OPTIONS}>
       <Tab.Screen
         name="SEHome"
         component={SEHomeScreen}
@@ -78,6 +121,14 @@ function SETabNavigator() {
           tabBarIcon: ({ focused, color }) => tabIcon("megaphone", focused, color),
         }}
       />
+      <Tab.Screen
+        name="SEProfile"
+        component={ProfileScreen}
+        options={{
+          tabBarLabel: "Profil",
+          tabBarIcon: ({ focused, color }) => <ProfileTabIcon focused={focused} color={color} />,
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -85,22 +136,7 @@ function SETabNavigator() {
 // ---- SPV Tab Navigator ----
 function SPVTabNavigator() {
   return (
-    <Tab.Navigator
-      screenOptions={{
-        tabBarActiveTintColor:   TabBar.activeTint,
-        tabBarInactiveTintColor: TabBar.inactiveTint,
-        tabBarStyle: {
-          backgroundColor:   TabBar.background,
-          borderTopColor:    TabBar.borderColor,
-          borderTopWidth:    1,
-          paddingBottom:     4,
-          paddingTop:        4,
-          height:            58,
-        },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
-        headerShown: false,
-      }}
-    >
+    <Tab.Navigator screenOptions={SHARED_TAB_OPTIONS}>
       <Tab.Screen
         name="SPVHome"
         component={SPVHomeScreen}
@@ -133,6 +169,14 @@ function SPVTabNavigator() {
           tabBarIcon: ({ focused, color }) => tabIcon("megaphone", focused, color),
         }}
       />
+      <Tab.Screen
+        name="SPVProfile"
+        component={ProfileScreen}
+        options={{
+          tabBarLabel: "Profil",
+          tabBarIcon: ({ focused, color }) => <ProfileTabIcon focused={focused} color={color} />,
+        }}
+      />
     </Tab.Navigator>
   );
 }
@@ -140,8 +184,7 @@ function SPVTabNavigator() {
 // ---- Root Navigator ----
 export default function RootNavigator() {
   const { isAuthenticated, user } = useAuthStore();
-  const isSE  = user?.role === "se"  || user?.role === "SE";
-  const isSPV = user?.role === "spv" || user?.role === "SPV";
+  const isSPV = user?.role === "spv";
 
   const stackScreenOptions = {
     headerStyle: { backgroundColor: Colors.white },
@@ -162,6 +205,10 @@ export default function RootNavigator() {
               options={{ ...stackScreenOptions, headerShown: true, title: "Antrean Approval" }} />
             <Stack.Screen name="TeamOverview" component={TeamOverviewScreen}
               options={{ ...stackScreenOptions, headerShown: true, title: "Ringkasan Tim" }} />
+            <Stack.Screen name="VisitDetail" component={VisitDetailScreen as any}
+              options={{ ...stackScreenOptions, headerShown: true, title: "Detail Kunjungan" }} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen}
+              options={{ ...stackScreenOptions, headerShown: true, title: "Notifikasi" }} />
           </>
         ) : (
           <>
@@ -180,6 +227,8 @@ export default function RootNavigator() {
               options={{ ...stackScreenOptions, headerShown: true, title: "Detail Kunjungan" }} />
             <Stack.Screen name="RevisionEdit" component={RevisionEditScreen as any}
               options={{ ...stackScreenOptions, headerShown: true, title: "Revisi Kunjungan" }} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen}
+              options={{ ...stackScreenOptions, headerShown: true, title: "Notifikasi" }} />
           </>
         )}
       </Stack.Navigator>

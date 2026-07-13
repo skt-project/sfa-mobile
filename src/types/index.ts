@@ -67,7 +67,9 @@ export interface VisitItem {
 export interface Visit {
   visit_id: string;
   salesman_sk: string;
+  salesman_name?: string;
   outlet_sk?: string;
+  store_name?: string;
   schedule_id?: string;
   visit_date: string;
   visit_type: VisitType;
@@ -142,6 +144,26 @@ export interface KpiData {
   date?: string;
 }
 
+// Skipped Store — SE marks a store as skipped; SPV reviews in approval queue
+export type SkippedStoreStatus = "PENDING_SPV" | "RETURNED_TO_SALESMAN" | "EXECUTED_BY_SPV" | "EXPIRED";
+
+export interface SkippedStore {
+  skipped_store_id: string;
+  salesman_sk: string;
+  outlet_sk: string;
+  outlet_name: string | null;
+  distributor_code: string | null;
+  brand_group: string | null;
+  week_iso: string;
+  visit_date: string;
+  skipped_at: string;
+  status: SkippedStoreStatus;
+  spv_action_by: string | null;
+  spv_action_at: string | null;
+  spv_notes: string | null;
+  executed_visit_id: string | null;
+}
+
 // Sync queue item stored in SQLite
 export interface SyncQueueItem {
   id?: number;
@@ -177,4 +199,5 @@ export interface LocalVisit {
   notes?: string;
   items_json?: string;
   sync_status: "local" | "syncing" | "synced" | "failed";
+  submitted_at?: string;  // ISO timestamp when successfully submitted to SPV
 }

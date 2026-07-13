@@ -1,0 +1,10 @@
+diff --git a/node_modules/expo-sqlite/android/CMakeLists.txt b/node_modules/expo-sqlite/android/CMakeLists.txt
+index c15cf92..bba00cd 100644
+--- a/node_modules/expo-sqlite/android/CMakeLists.txt
++++ b/node_modules/expo-sqlite/android/CMakeLists.txt
+@@ -65,4 +65,5 @@ target_link_libraries(
+   ${LIBSQL_LIB}
+   fbjni::fbjni
+   android
++  c++_shared
+ )

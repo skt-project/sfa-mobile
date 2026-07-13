@@ -32,6 +32,8 @@ function KpiTile({ value, label, icon, iconBg, iconColor, onPress }: KpiTileProp
     <Pressable
       style={({ pressed }) => [styles.kpiTile, pressed && styles.kpiTilePressed]}
       onPress={onPress}
+      accessibilityLabel={`${label}: ${value}`}
+      accessibilityRole={onPress ? "button" : undefined}
     >
       <View style={[styles.kpiIconWrap, { backgroundColor: iconBg }]}>
         <Ionicons name={icon} size={18} color={iconColor} />
@@ -56,12 +58,14 @@ function ActionCard({ icon, label, badge, onPress }: ActionCardProps) {
     <Pressable
       style={({ pressed }) => [styles.actionCard, pressed && styles.actionCardPressed]}
       onPress={onPress}
+      accessibilityLabel={badge != null && badge > 0 ? `${label}, ${badge} menunggu` : label}
+      accessibilityRole="button"
     >
       <View style={styles.actionIconWrap}>
-        <Ionicons name={icon} size={24} color={Colors.primary} />
+        <Ionicons name={icon} size={24} color={Colors.primary} accessible={false} />
         {badge != null && badge > 0 && (
-          <View style={styles.actionBadge}>
-            <Text style={styles.actionBadgeText}>{badge > 99 ? "99+" : badge}</Text>
+          <View style={styles.actionBadge} accessible={false}>
+            <Text style={styles.actionBadgeText} accessible={false}>{badge > 99 ? "99+" : badge}</Text>
           </View>
         )}
       </View>
@@ -81,7 +85,7 @@ function SectionHeading({ title, action, onAction }: {
     <View style={styles.sectionHeading}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {action && (
-        <TouchableOpacity onPress={onAction}>
+        <TouchableOpacity onPress={onAction} accessibilityRole="button" accessibilityLabel={action}>
           <Text style={styles.sectionAction}>{action}</Text>
         </TouchableOpacity>
       )}
@@ -100,15 +104,20 @@ interface PendingVisitProps {
 
 function PendingVisitRow({ title, submittedBy, date, onPress }: PendingVisitProps) {
   return (
-    <TouchableOpacity style={styles.visitRow} onPress={onPress}>
+    <TouchableOpacity
+      style={styles.visitRow}
+      onPress={onPress}
+      accessibilityLabel={`${title}, ${submittedBy}, ${date}`}
+      accessibilityRole="button"
+    >
       <View style={[styles.visitIcon, { backgroundColor: Colors.warningBg }]}>
-        <Ionicons name="time-outline" size={16} color={Colors.warning} />
+        <Ionicons name="time-outline" size={16} color={Colors.warning} accessible={false} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={styles.visitTitle} numberOfLines={1}>{title}</Text>
         <Text style={styles.visitMeta}>{submittedBy} · {date}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={16} color={Colors.slate300} />
+      <Ionicons name="chevron-forward" size={16} color={Colors.slate300} accessible={false} />
     </TouchableOpacity>
   );
 }
@@ -140,8 +149,8 @@ export default function SPVHomeScreen({ navigation }: Props) {
   }, [refetchPending, refetchTeam]);
 
   const pendingCount = pending?.total ?? 0;
-  const totalDemand  = (teamKpi?.members ?? []).reduce((s: number, m: any) => s + (m.total_demand ?? 0), 0);
-  const visitedToday = (teamKpi?.members ?? []).reduce((s: number, m: any) => s + (m.visit_today ?? 0), 0);
+  const totalDemand  = (teamKpi?.members ?? []).reduce((s, m) => s + (m.total_demand ?? 0), 0);
+  const visitedToday = (teamKpi?.members ?? []).reduce((s, m) => s + (m.total_visits ?? 0), 0);
   const teamSize     = teamKpi?.total_members ?? 0;
 
   const greeting = (() => {
@@ -179,8 +188,10 @@ export default function SPVHomeScreen({ navigation }: Props) {
                 { text: "Keluar", style: "destructive", onPress: logout },
               ])
             }
+            accessibilityLabel="Keluar"
+            accessibilityRole="button"
           >
-            <Ionicons name="log-out-outline" size={18} color="rgba(255,255,255,0.9)" />
+            <Ionicons name="log-out-outline" size={18} color="rgba(255,255,255,0.9)" accessible={false} />
           </TouchableOpacity>
         </View>
 
@@ -191,15 +202,17 @@ export default function SPVHomeScreen({ navigation }: Props) {
             onPress={() => navigation.navigate("ApprovalQueue")}
             testID="btn-pending-alert"
             activeOpacity={0.85}
+            accessibilityLabel={`${pendingCount} kunjungan menunggu persetujuan`}
+            accessibilityRole="button"
           >
             <View style={styles.alertIconWrap}>
-              <Ionicons name="time" size={18} color={Colors.warning} />
+              <Ionicons name="time" size={18} color={Colors.warning} accessible={false} />
             </View>
             <Text style={styles.alertText}>
               <Text style={styles.alertCount}>{pendingCount} kunjungan</Text>
               {" "}menunggu persetujuan Anda
             </Text>
-            <Ionicons name="chevron-forward" size={16} color="#92400E" />
+            <Ionicons name="chevron-forward" size={16} color="#92400E" accessible={false} />
           </TouchableOpacity>
         )}
 
@@ -252,16 +265,6 @@ export default function SPVHomeScreen({ navigation }: Props) {
               label="Pantau Tim"
               onPress={() => navigation.navigate("TeamOverview")}
             />
-            <ActionCard
-              icon="bar-chart-outline"
-              label="Laporan"
-              onPress={() => navigation.navigate("Reports")}
-            />
-            <ActionCard
-              icon="map-outline"
-              label="Rute"
-              onPress={() => navigation.navigate("RouteList")}
-            />
           </View>
         </View>
 
@@ -274,13 +277,29 @@ export default function SPVHomeScreen({ navigation }: Props) {
               onAction={() => navigation.navigate("ApprovalQueue")}
             />
             <View style={styles.card}>
-              {(pending?.items ?? []).slice(0, 5).map((v: any) => (
+              {(pending?.items ?? []).slice(0, 5).map((v) => (
                 <PendingVisitRow
                   key={v.visit_id}
                   title={v.store_name ?? v.outlet_sk ?? v.visit_id}
                   submittedBy={v.salesman_name ?? v.salesman_sk ?? "—"}
                   date={v.visit_date ?? "—"}
-                  onPress={() => navigation.navigate("VisitDetail", { visitId: v.visit_id })}
+                  onPress={() => navigation.navigate("VisitDetail", {
+                    item: {
+                      id: v.visit_id,
+                      outlet_name: v.store_name ?? v.outlet_sk ?? v.visit_id,
+                      visit_date: v.visit_date,
+                      checkin_time: v.checkin_time,
+                      checkout_time: v.checkout_time,
+                      total_demand: v.total_demand ?? 0,
+                      effective_call: v.effective_call ?? "NO",
+                      duration_min: v.duration_minutes,
+                      items_json: v.items ? JSON.stringify(v.items) : undefined,
+                      source: "server" as const,
+                      server_visit_id: v.visit_id,
+                      approval_status: v.approval_status,
+                      rejection_notes: v.rejection_notes,
+                    },
+                  })}
                 />
               ))}
             </View>
@@ -296,13 +315,13 @@ export default function SPVHomeScreen({ navigation }: Props) {
               onAction={() => navigation.navigate("TeamOverview")}
             />
             <View style={styles.card}>
-              {(teamKpi?.members ?? []).slice(0, 5).map((m: any) => {
-                const ecRate = m.ec_rate ?? 0;
+              {(teamKpi?.members ?? []).slice(0, 5).map((m) => {
+                const ecRate = m.strike_rate ?? 0;
                 const color  = ecRate >= 80 ? Colors.success : ecRate >= 60 ? Colors.primary : Colors.danger;
                 return (
                   <View key={m.salesman_sk} style={styles.memberRow}>
                     <View style={[styles.memberAvatar, { backgroundColor: Colors.primaryBg }]}>
-                      <Ionicons name="person-outline" size={14} color={Colors.primary} />
+                      <Ionicons name="person-outline" size={14} color={Colors.primary} accessible={false} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.memberName} numberOfLines={1}>{m.salesman_name}</Text>
@@ -313,7 +332,7 @@ export default function SPVHomeScreen({ navigation }: Props) {
                         <Text style={[styles.memberPct, { color }]}>{ecRate.toFixed(0)}%</Text>
                       </View>
                     </View>
-                    <Text style={styles.memberVisit}>{m.visit_today ?? 0} toko</Text>
+                    <Text style={styles.memberVisit}>{m.total_visits ?? 0} toko</Text>
                   </View>
                 );
               })}

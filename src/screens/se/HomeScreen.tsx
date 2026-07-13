@@ -51,9 +51,11 @@ function ActionBtn({ icon, label, onPress, variant = "primary" }: ActionBtnProps
       style={[styles.actionBtn, isPrimary ? styles.actionBtnPrimary : styles.actionBtnSecondary]}
       onPress={onPress}
       activeOpacity={0.8}
+      accessibilityLabel={label}
+      accessibilityRole="button"
     >
       <View style={[styles.actionIcon, { backgroundColor: isPrimary ? "rgba(255,255,255,0.2)" : Colors.primaryBg }]}>
-        <Ionicons name={icon} size={20} color={isPrimary ? Colors.white : Colors.primary} />
+        <Ionicons name={icon} size={20} color={isPrimary ? Colors.white : Colors.primary} accessible={false} />
       </View>
       <Text style={[styles.actionLabel, { color: isPrimary ? Colors.white : Colors.primary }]}>
         {label}
@@ -63,6 +65,7 @@ function ActionBtn({ icon, label, onPress, variant = "primary" }: ActionBtnProps
         size={16}
         color={isPrimary ? "rgba(255,255,255,0.6)" : Colors.slate400}
         style={styles.actionChevron}
+        accessible={false}
       />
     </TouchableOpacity>
   );
@@ -130,8 +133,10 @@ export default function SEHomeScreen({ navigation }: Props) {
                 ])
               }
               testID="btn-logout"
+              accessibilityLabel="Keluar"
+              accessibilityRole="button"
             >
-              <Ionicons name="log-out-outline" size={20} color="rgba(255,255,255,0.8)" />
+              <Ionicons name="log-out-outline" size={20} color="rgba(255,255,255,0.8)" accessible={false} />
             </TouchableOpacity>
           </View>
         </View>
@@ -187,7 +192,7 @@ export default function SEHomeScreen({ navigation }: Props) {
       {/* ── Alert banners ── */}
       {(kpi?.pending_approvals ?? 0) > 0 && (
         <View style={[styles.alertBanner, styles.alertInfo]}>
-          <Ionicons name="time-outline" size={18} color={Colors.primary} />
+          <Ionicons name="time-outline" size={18} color={Colors.primary} accessible={false} />
           <Text style={[styles.alertText, { color: Colors.primaryDark }]}>
             {kpi?.pending_approvals} kunjungan menunggu persetujuan
           </Text>
@@ -196,7 +201,7 @@ export default function SEHomeScreen({ navigation }: Props) {
 
       {(kpi?.revision_count ?? 0) > 0 && (
         <View style={[styles.alertBanner, styles.alertWarning]}>
-          <Ionicons name="create-outline" size={18} color={Colors.warning} />
+          <Ionicons name="create-outline" size={18} color={Colors.warning} accessible={false} />
           <Text style={[styles.alertText, { color: "#92400E" }]}>
             {kpi?.revision_count} kunjungan perlu direvisi
           </Text>

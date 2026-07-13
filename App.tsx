@@ -8,6 +8,7 @@ import { getDb } from "./src/db/schema";
 import { getPendingSyncVisits } from "./src/db/visits";
 import { flushPendingVisits } from "./src/sync/engine";
 import { registerPushToken } from "./src/notifications";
+import { setUnauthorizedHandler } from "./src/api/client";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -25,6 +26,9 @@ export default function App() {
   const wasOnlineRef = useRef<boolean | null>(null);
 
   useEffect(() => {
+    // When the server returns 401, clear auth state so RootNavigator redirects to Login.
+    setUnauthorizedHandler(() => useAuthStore.getState().logout());
+
     // Initialize DB + rehydrate auth
     getDb().then(() => rehydrate());
 

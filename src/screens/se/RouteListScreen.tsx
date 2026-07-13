@@ -101,11 +101,13 @@ function StoreCard({ item, status, isSkippable, onPress, onToggleSkip }: StoreCa
       ]}
       onPress={onPress}
       testID={`store-${item.outlet_sk}`}
+      accessibilityLabel={`${item.store_name ?? item.source_outlet_code}, ${cfg.label}`}
+      accessibilityRole="button"
     >
       <View style={styles.cardInner}>
         {/* Status badge circle */}
         <View style={[styles.statusCircle, { backgroundColor: cfg.bgColor }]}>
-          <Ionicons name={cfg.icon} size={20} color={cfg.color} />
+          <Ionicons name={cfg.icon} size={20} color={cfg.color} accessible={false} />
         </View>
 
         {/* Store info */}
@@ -134,6 +136,8 @@ function StoreCard({ item, status, isSkippable, onPress, onToggleSkip }: StoreCa
               onPress={onToggleSkip}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               testID={`btn-skip-${item.outlet_sk}`}
+              accessibilityLabel={isSkipped ? `Batalkan terlewat ${item.store_name ?? item.outlet_sk}` : `Tandai terlewat ${item.store_name ?? item.outlet_sk}`}
+              accessibilityRole="button"
             >
               <Text style={[styles.skipBtnText, isSkipped && styles.skipBtnTextActive]}>
                 {isSkipped ? "Batalkan" : "Terlewat"}
@@ -234,7 +238,6 @@ export default function RouteListScreen({ navigation }: Props) {
               const skippedStores = (displayStores ?? [])
                 .filter((s) => skippedSet.has(s.outlet_sk))
                 .map((s) => ({
-                  salesman_sk:      salesmanSk,
                   outlet_sk:        s.outlet_sk,
                   outlet_name:      s.store_name,
                   distributor_code: s.distributor_code,
@@ -242,7 +245,7 @@ export default function RouteListScreen({ navigation }: Props) {
                   week_iso:         weekIso,
                   visit_date:       today,
                 }));
-              const result = await submitSkippedStores(skippedStores);
+              const result = await submitSkippedStores(salesmanSk, skippedStores);
               setSkippedSet(new Set());
               Alert.alert(
                 "Berhasil",
@@ -295,7 +298,7 @@ export default function RouteListScreen({ navigation }: Props) {
             </Text>
             {skippedSet.size > 0 && (
               <View style={styles.skippedChip}>
-                <Ionicons name="warning-outline" size={11} color="#EA580C" />
+                <Ionicons name="warning-outline" size={11} color="#EA580C" accessible={false} />
                 <Text style={styles.skippedChipText}>{skippedSet.size} terlewat</Text>
               </View>
             )}
@@ -307,10 +310,12 @@ export default function RouteListScreen({ navigation }: Props) {
           onPress={handleDownload}
           disabled={downloading}
           testID="btn-download-route"
+          accessibilityLabel={downloading ? "Sedang mengunduh rute…" : "Unduh rute hari ini"}
+          accessibilityRole="button"
         >
           {downloading
             ? <ActivityIndicator color={Colors.white} size="small" />
-            : <Ionicons name="cloud-download-outline" size={16} color={Colors.white} />}
+            : <Ionicons name="cloud-download-outline" size={16} color={Colors.white} accessible={false} />}
           <Text style={styles.downloadBtnText}>{downloading ? "Mengunduh…" : "Unduh"}</Text>
         </TouchableOpacity>
       </View>
@@ -319,7 +324,7 @@ export default function RouteListScreen({ navigation }: Props) {
       <View style={styles.legendBar}>
         {(Object.entries(STATUS_CONFIG) as [VisitStageStatus, StatusConfig][]).map(([key, cfg]) => (
           <View key={key} style={styles.legendChip}>
-            <Ionicons name={cfg.icon} size={12} color={cfg.color} />
+            <Ionicons name={cfg.icon} size={12} color={cfg.color} accessible={false} />
             <Text style={[styles.legendLabel, { color: cfg.color }]}>{cfg.label}</Text>
           </View>
         ))}
@@ -328,7 +333,7 @@ export default function RouteListScreen({ navigation }: Props) {
       {/* ── List ── */}
       {isLoading ? (
         <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color={Colors.primary} />
+          <ActivityIndicator size="large" color={Colors.primary} accessibilityLabel="Memuat rute…" />
           <Text style={styles.loadingText}>Memuat rute…</Text>
         </View>
       ) : (
@@ -340,7 +345,7 @@ export default function RouteListScreen({ navigation }: Props) {
           contentContainerStyle={{ paddingVertical: Spacing.sm }}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
-              <Ionicons name="map-outline" size={40} color={Colors.slate300} />
+              <Ionicons name="map-outline" size={40} color={Colors.slate300} accessible={false} />
               <Text style={styles.emptyTitle}>Tidak ada toko hari ini</Text>
               <Text style={styles.emptySubtitle}>Jadwal kunjungan untuk hari ini belum tersedia.</Text>
             </View>
@@ -358,12 +363,14 @@ export default function RouteListScreen({ navigation }: Props) {
             onPress={handleSubmitSkipped}
             disabled={submittingSkip}
             testID="btn-submit-skipped"
+            accessibilityLabel={submittingSkip ? "Sedang mengirim…" : `Kirim ${skippedSet.size} toko terlewat ke SPV`}
+            accessibilityRole="button"
           >
             {submittingSkip ? (
               <ActivityIndicator color={Colors.white} size="small" />
             ) : (
               <>
-                <Ionicons name="send-outline" size={16} color={Colors.white} />
+                <Ionicons name="send-outline" size={16} color={Colors.white} accessible={false} />
                 <Text style={styles.submitSkipBtnText}>
                   Kirim {skippedSet.size} Toko Terlewat ke SPV
                 </Text>

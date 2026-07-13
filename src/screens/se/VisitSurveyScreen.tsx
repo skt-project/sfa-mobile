@@ -66,6 +66,8 @@ const SkuCard = React.memo(function SkuCard({
           onPress={() => onSetQty(item.sku_id, qty - 1)}
           disabled={qty === 0}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel={`Kurangi qty ${item.sku_name}`}
+          accessibilityRole="button"
         >
           <Text style={[styles.qtyBtnText, qty === 0 && styles.qtyBtnTextDisabled]}>
             −
@@ -77,11 +79,14 @@ const SkuCard = React.memo(function SkuCard({
           onChangeText={(v) => onSetQty(item.sku_id, parseInt(v) || 0)}
           keyboardType="number-pad"
           selectTextOnFocus
+          accessibilityLabel={`Jumlah ${item.sku_name}`}
         />
         <TouchableOpacity
           style={styles.qtyBtn}
           onPress={() => onSetQty(item.sku_id, qty + 1)}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          accessibilityLabel={`Tambah qty ${item.sku_name}`}
+          accessibilityRole="button"
         >
           <Text style={styles.qtyBtnText}>+</Text>
         </TouchableOpacity>
@@ -300,6 +305,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
               name={effectiveCall === "YES" ? "checkmark-outline" : "close-outline"}
               size={13}
               color={Colors.white}
+              accessible={false}
             />
             <Text style={styles.ecText}>
               {effectiveCall === "YES" ? "Efektif" : "Tidak Efektif"}
@@ -316,6 +322,8 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
             style={styles.tabBarToggle}
             onPress={() => setTabsOpen((v) => !v)}
             activeOpacity={0.7}
+            accessibilityLabel={tabsOpen ? "Sembunyikan filter brand" : "Tampilkan filter brand"}
+            accessibilityRole="button"
           >
             <Text style={styles.tabBarToggleLabel} numberOfLines={1}>
               Brand
@@ -324,6 +332,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
               name={tabsOpen ? "chevron-up" : "chevron-down"}
               size={14}
               color={Colors.slate400}
+              accessible={false}
             />
           </TouchableOpacity>
 
@@ -344,6 +353,9 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
                       setActiveTab(tab);
                       setSearch("");
                     }}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: activeTab === tab }}
+                    accessibilityLabel={tab}
                   >
                     <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
                       {tab}
@@ -364,13 +376,16 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
           placeholderTextColor={Colors.slate400}
           value={search}
           onChangeText={setSearch}
+          accessibilityLabel="Cari produk"
         />
         {search.length > 0 && (
           <TouchableOpacity
             onPress={() => setSearch("")}
             style={styles.searchClear}
+            accessibilityLabel="Hapus pencarian"
+            accessibilityRole="button"
           >
-            <Ionicons name="close-circle" size={20} color={Colors.slate400} />
+            <Ionicons name="close-circle" size={20} color={Colors.slate400} accessible={false} />
           </TouchableOpacity>
         )}
       </View>
@@ -397,6 +412,8 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
               <TouchableOpacity
                 style={styles.retryBtn}
                 onPress={() => refetchSkus()}
+                accessibilityLabel="Coba lagi memuat produk"
+                accessibilityRole="button"
               >
                 <Text style={styles.retryBtnText}>Coba Lagi</Text>
               </TouchableOpacity>
@@ -431,6 +448,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
               placeholder="Kondisi toko, feedback pelanggan, kendala, dll..."
               placeholderTextColor={Colors.slate300}
               testID="input-notes"
+              accessibilityLabel="Catatan kunjungan"
             />
           </View>
         }
@@ -443,6 +461,12 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
           onPress={handleCheckout}
           disabled={loading}
           testID="btn-checkout"
+          accessibilityLabel={
+            filledCount > 0
+              ? `Lanjut check-out, ${filledCount} SKU, ${totalQty} pcs`
+              : "Lanjut check-out tanpa demand"
+          }
+          accessibilityRole="button"
         >
           {loading ? (
             <ActivityIndicator color="#fff" />

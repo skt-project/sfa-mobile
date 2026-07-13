@@ -67,4 +67,9 @@ async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_local_visits_date ON local_visits (visit_date);
     CREATE INDEX IF NOT EXISTS idx_sync_queue_status ON sync_queue (status);
   `);
+
+  // v2: add submitted_at — ALTER TABLE fails silently if column already exists
+  try {
+    await db.execAsync("ALTER TABLE local_visits ADD COLUMN submitted_at TEXT");
+  } catch { /* column already exists */ }
 }

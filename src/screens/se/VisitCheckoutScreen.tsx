@@ -200,7 +200,7 @@ export default function VisitCheckoutScreen({ route, navigation }: Props) {
       {isOffline && (
         <View style={styles.offlineBanner}>
           <View style={styles.offlineRow}>
-            <Ionicons name="cloud-offline-outline" size={16} color="#92400E" />
+            <Ionicons name="cloud-offline-outline" size={16} color="#92400E" accessible={false} />
             <Text style={styles.offlineText}>
               Data disimpan lokal. Lakukan pull-to-refresh saat kembali online untuk sinkronisasi otomatis ke SPV.
             </Text>
@@ -214,6 +214,8 @@ export default function VisitCheckoutScreen({ route, navigation }: Props) {
         onPress={handleSubmit}
         disabled={submitting}
         testID="btn-submit"
+        accessibilityLabel={isOffline ? "Selesai" : "Submit ke SPV"}
+        accessibilityRole="button"
       >
         {submitting ? (
           <ActivityIndicator color={Colors.white} />
@@ -224,7 +226,12 @@ export default function VisitCheckoutScreen({ route, navigation }: Props) {
         )}
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.backBtn} onPress={() => goHome(navigation)}>
+      <TouchableOpacity
+        style={styles.backBtn}
+        onPress={() => goHome(navigation)}
+        accessibilityLabel="Kembali ke Home"
+        accessibilityRole="button"
+      >
         <Text style={styles.backText}>Kembali ke Home</Text>
       </TouchableOpacity>
     </ScrollView>

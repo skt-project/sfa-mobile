@@ -7,6 +7,9 @@ declare module "react-native-vector-icons/Ionicons" {
     size?: number;
     color?: string;
     style?: TextStyle | ViewStyle;
+    accessible?: boolean;
+    accessibilityLabel?: string;
+    testID?: string;
   }
 
   export default class Icon extends Component<IconProps> {}
@@ -21,6 +24,9 @@ declare module "react-native-vector-icons/MaterialIcons" {
     size?: number;
     color?: string;
     style?: TextStyle | ViewStyle;
+    accessible?: boolean;
+    accessibilityLabel?: string;
+    testID?: string;
   }
 
   export default class Icon extends Component<IconProps> {}

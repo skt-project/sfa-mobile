@@ -54,37 +54,49 @@ export async function flushPendingVisits(): Promise<{
 async function syncOneVisit(local: LocalVisit): Promise<void> {
   await updateLocalVisitSyncStatus(local.local_id, "syncing");
 
-  // Step 1: checkin
-  const checkinResp = await checkin({
-    salesman_sk: local.salesman_sk,
-    outlet_sk: local.outlet_sk ?? "",
-    visit_date: local.visit_date,
-    visit_type: local.visit_type,
-    checkin_latitude: local.checkin_lat ?? undefined,
-    checkin_longitude: local.checkin_lon ?? undefined,
-    schedule_id: local.schedule_id ?? undefined,
-    offline_mode: true,
-    captured_at: local.checkin_time ?? undefined,
-  });
+  let serverVisitId: string;
 
-  const serverVisitId = checkinResp.visit_id;
+  if (local.server_visit_id) {
+    // Visit was checked in online but checkout failed due to network drop.
+    // The server record already exists — skip checkin to avoid a duplicate.
+    serverVisitId = local.server_visit_id;
+  } else {
+    // Step 1: checkin (fully offline visit)
+    const checkinResp = await checkin({
+      salesman_sk: local.salesman_sk,
+      outlet_sk: local.outlet_sk ?? "",
+      visit_date: local.visit_date,
+      visit_type: local.visit_type,
+      checkin_latitude: local.checkin_lat ?? undefined,
+      checkin_longitude: local.checkin_lon ?? undefined,
+      schedule_id: local.schedule_id ?? undefined,
+      offline_mode: true,
+      captured_at: local.checkin_time ?? undefined,
+    });
+    serverVisitId = checkinResp.visit_id;
+  }
 
-  // Step 2: checkout (if done offline)
+  // Step 2: checkout (records time/coords only — items go with submit)
   if (local.checkout_time) {
-    const items: VisitItem[] = local.items_json ? JSON.parse(local.items_json) : [];
     await checkout(serverVisitId, {
       checkout_latitude: local.checkout_lat ?? undefined,
       checkout_longitude: local.checkout_lon ?? undefined,
       total_demand: local.total_demand,
       effective_call: local.effective_call,
       notes: local.notes ?? undefined,
-      items,
+      items: [],
       offline_mode: true,
       captured_at: local.checkout_time,
     });
 
-    // Step 3: auto-submit
-    await submitVisit(serverVisitId);
+    // Step 3: auto-submit with items — first time items land in BigQuery
+    const items: VisitItem[] = local.items_json ? JSON.parse(local.items_json) : [];
+    await submitVisit(serverVisitId, {
+      total_demand: local.total_demand,
+      effective_call: local.effective_call,
+      items,
+      offline_mode: true,
+    });
   }
 
   await updateLocalVisitSyncStatus(local.local_id, "synced", serverVisitId);

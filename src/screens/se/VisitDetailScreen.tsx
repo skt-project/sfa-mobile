@@ -63,6 +63,7 @@ export default function VisitDetailScreen({ route }: Props) {
           name={isComplete ? "checkmark-circle-outline" : "time-outline"}
           size={18}
           color={isComplete ? Colors.success : "#92400E"}
+          accessible={false}
         />
         <Text style={[styles.bannerText, isComplete ? styles.bannerTextComplete : styles.bannerTextPartial]}>
           {isComplete ? "Kunjungan Selesai" : "Kunjungan Parsial (belum checkout)"}
@@ -102,6 +103,7 @@ export default function VisitDetailScreen({ route }: Props) {
             source={{ uri: item.checkin_photo_path }}
             style={styles.photo}
             resizeMode="cover"
+            accessibilityLabel={`Foto check-in toko ${item.outlet_name}`}
           />
         </View>
       ) : null}

@@ -158,13 +158,13 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
         <Text style={styles.sectionTitle}>Lokasi GPS</Text>
         {gpsStatus === "fetching" && (
           <View style={styles.statusRow}>
-            <ActivityIndicator size="small" color={Colors.primary} />
+            <ActivityIndicator size="small" color={Colors.primary} accessibilityLabel="Mencari lokasi…" />
             <Text style={styles.statusText}>Mencari lokasi...</Text>
           </View>
         )}
         {gpsStatus === "done" && coords && (
           <View style={styles.statusRow}>
-            <Ionicons name="checkmark-circle-outline" size={16} color={Colors.success} />
+            <Ionicons name="checkmark-circle-outline" size={16} color={Colors.success} accessible={false} />
             <Text style={styles.gpsSuccess}>
               {coords.lat.toFixed(5)}, {coords.lon.toFixed(5)}
             </Text>
@@ -172,7 +172,7 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
         )}
         {gpsStatus === "failed" && (
           <View style={styles.statusRow}>
-            <Ionicons name="warning-outline" size={16} color={Colors.warning} />
+            <Ionicons name="warning-outline" size={16} color={Colors.warning} accessible={false} />
             <Text style={styles.gpsWarn}>
               Lokasi tidak tersedia — kunjungan tetap dapat dilanjutkan
             </Text>
@@ -192,13 +192,20 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
 
         {photoUri ? (
           <View>
-            <Image source={{ uri: photoUri }} style={styles.photoPreview} resizeMode="cover" />
-            <TouchableOpacity style={styles.photoButtonRetake} onPress={pickPhoto} testID="btn-photo">
+            <Image source={{ uri: photoUri }} style={styles.photoPreview} resizeMode="cover" accessibilityLabel={`Pratinjau foto toko ${store.store_name ?? store.source_outlet_code}`} />
+            <TouchableOpacity
+              style={styles.photoButtonRetake}
+              onPress={pickPhoto}
+              testID="btn-photo"
+              accessibilityLabel={Platform.OS === "web" ? "Ganti foto" : "Ambil ulang foto"}
+              accessibilityRole="button"
+            >
               <View style={styles.retakeRow}>
                 <Ionicons
                   name={Platform.OS === "web" ? "folder-open-outline" : "camera-outline"}
                   size={18}
                   color={Colors.slate600}
+                  accessible={false}
                 />
                 <Text style={styles.photoButtonRetakeText}>
                   {Platform.OS === "web" ? "Ganti Foto" : "Ambil Ulang"}
@@ -211,11 +218,14 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
             style={[styles.photoButton, photoError && styles.photoButtonError]}
             onPress={pickPhoto}
             testID="btn-photo"
+            accessibilityLabel={Platform.OS === "web" ? "Pilih foto dari galeri" : "Ambil foto toko"}
+            accessibilityRole="button"
           >
             <Ionicons
               name="camera-outline"
               size={40}
               color={photoError ? Colors.danger : Colors.primary}
+              accessible={false}
             />
             <Text style={[styles.photoButtonText, photoError && styles.photoButtonTextError]}>
               {Platform.OS === "web" ? "Pilih Foto dari Galeri" : "Ambil Foto Toko"}
@@ -227,7 +237,7 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
         {photoError && !photoUri && (
           <View style={styles.errorBanner}>
             <View style={styles.statusRow}>
-              <Ionicons name="warning-outline" size={15} color={Colors.danger} />
+              <Ionicons name="warning-outline" size={15} color={Colors.danger} accessible={false} />
               <Text style={styles.errorText}>
                 Foto toko wajib diambil sebelum melanjutkan check-in.
               </Text>
@@ -240,7 +250,7 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
       {isOffline && (
         <View style={styles.offlineBanner}>
           <View style={styles.statusRow}>
-            <Ionicons name="cloud-offline-outline" size={16} color="#92400E" />
+            <Ionicons name="cloud-offline-outline" size={16} color="#92400E" accessible={false} />
             <Text style={styles.offlineText}>
               Mode Offline — kunjungan disimpan lokal dan akan disinkronkan saat online
             </Text>
@@ -252,8 +262,10 @@ export default function VisitCheckinScreen({ route, navigation }: Props) {
       <TouchableOpacity
         style={[styles.checkinButton, !canCheckin && styles.checkinButtonDisabled]}
         onPress={handleCheckin}
-        disabled={loading}
+        disabled={!canCheckin || loading}
         testID="btn-checkin"
+        accessibilityLabel={canCheckin ? "Check-In" : "Check-In — ambil foto terlebih dahulu"}
+        accessibilityRole="button"
       >
         {loading ? (
           <ActivityIndicator color={Colors.white} />
