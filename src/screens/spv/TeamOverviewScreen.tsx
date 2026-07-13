@@ -74,7 +74,7 @@ export default function TeamOverviewScreen({ navigation }: Props) {
         {[
           { value: String(data?.total_members ?? 0), label: "SE Aktif" },
           { value: String(totalVisits),               label: "Total Kunjungan" },
-          { value: `Rp ${(totalDemand / 1_000_000).toFixed(1)}M`, label: "Total Demand" },
+          { value: `Rp ${(totalDemand / 1_000_000).toFixed(1)}M`, label: "Total Order" },
         ].map((item) => (
           <View key={item.label} style={styles.summaryItem}>
             <Text style={styles.summaryValue}>{item.value}</Text>

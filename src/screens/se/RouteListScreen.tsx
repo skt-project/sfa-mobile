@@ -79,15 +79,25 @@ function BrandTag({ label, variant }: { label: string; variant?: "skt" | "g2g" |
 
 // ── Store card ────────────────────────────────────────────────────────────────
 
+type SyncState = "none" | "local" | "synced";
+
+// Whether a completed visit's data is still local-only or already on the server.
+function getStoreSync(store: ScheduleStore, localVisits: LocalVisit[]): SyncState {
+  const visit = localVisits.find((v) => v.outlet_sk === store.outlet_sk);
+  if (!visit || !visit.checkout_time) return "none"; // nothing to sync yet
+  return visit.sync_status === "synced" ? "synced" : "local";
+}
+
 interface StoreCardProps {
   item: ScheduleStore;
   status: VisitStageStatus;
+  syncState: SyncState;
   isSkippable: boolean;
   onPress: () => void;
   onToggleSkip: () => void;
 }
 
-function StoreCard({ item, status, isSkippable, onPress, onToggleSkip }: StoreCardProps) {
+function StoreCard({ item, status, syncState, isSkippable, onPress, onToggleSkip }: StoreCardProps) {
   const cfg = STATUS_CONFIG[status];
   const isSkipped = status === "skipped";
 
@@ -127,9 +137,26 @@ function StoreCard({ item, status, isSkippable, onPress, onToggleSkip }: StoreCa
           </View>
         </View>
 
-        {/* Right: status label + skip button */}
+        {/* Right: status label + sync indicator + skip button */}
         <View style={styles.rightCol}>
           <Text style={[styles.statusLabel, { color: cfg.color }]}>{cfg.label}</Text>
+          {syncState !== "none" && (
+            <View
+              style={[styles.syncPill, syncState === "synced" ? styles.syncPillOk : styles.syncPillLocal]}
+              accessibilityLabel={syncState === "synced" ? "Tersinkron ke server" : "Tersimpan lokal, belum tersinkron"}
+            >
+              <View
+                style={[styles.syncDot, { backgroundColor: syncState === "synced" ? Colors.success : Colors.warning }]}
+                accessible={false}
+              />
+              <Text
+                style={[styles.syncText, { color: syncState === "synced" ? Colors.success : "#B45309" }]}
+                accessible={false}
+              >
+                {syncState === "synced" ? "Tersinkron" : "Local"}
+              </Text>
+            </View>
+          )}
           {isSkippable && (
             <TouchableOpacity
               style={[styles.skipBtn, isSkipped && styles.skipBtnActive]}
@@ -277,6 +304,7 @@ export default function RouteListScreen({ navigation }: Props) {
       <StoreCard
         item={item}
         status={status}
+        syncState={getStoreSync(item, localVisits)}
         isSkippable={status === "not_visited" || status === "skipped"}
         onPress={() => {
           if (status === "skipped") return;
@@ -484,8 +512,16 @@ const styles = StyleSheet.create({
   tagRow: { flexDirection: "row", gap: Spacing.xs, marginTop: Spacing.xs, flexWrap: "wrap" },
   tag: { borderRadius: Radius.sm, paddingHorizontal: 7, paddingVertical: 2 },
   tagText: { fontSize: Typography.xs, fontWeight: Typography.medium },
-  rightCol: { alignItems: "center", gap: Spacing.xs, minWidth: 60 },
+  rightCol: { alignItems: "center", gap: Spacing.xs, minWidth: 66 },
   statusLabel: { fontSize: Typography.xs, fontWeight: Typography.semibold, textAlign: "center" },
+  syncPill: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    borderRadius: Radius.full, paddingHorizontal: 7, paddingVertical: 2,
+  },
+  syncPillOk:    { backgroundColor: Colors.successBg },
+  syncPillLocal: { backgroundColor: Colors.warningBg },
+  syncDot:  { width: 6, height: 6, borderRadius: 3 },
+  syncText: { fontSize: 10, fontWeight: Typography.bold },
   skipBtn: {
     borderWidth: 1, borderColor: Colors.slate200, borderRadius: Radius.sm,
     paddingHorizontal: Spacing.sm, paddingVertical: 4,

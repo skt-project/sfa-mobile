@@ -188,10 +188,11 @@ export default function SPVHomeScreen({ navigation }: Props) {
                 { text: "Keluar", style: "destructive", onPress: logout },
               ])
             }
-            accessibilityLabel="Keluar"
+            accessibilityLabel="Logout"
             accessibilityRole="button"
           >
-            <Ionicons name="log-out-outline" size={18} color="rgba(255,255,255,0.9)" accessible={false} />
+            <Ionicons name="log-out-outline" size={16} color="rgba(255,255,255,0.9)" accessible={false} />
+            <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
         </View>
 
@@ -243,7 +244,7 @@ export default function SPVHomeScreen({ navigation }: Props) {
           />
           <KpiTile
             value={`Rp ${(totalDemand / 1_000_000).toFixed(1)}M`}
-            label="Total Demand MTD"
+            label="Total Order MTD"
             icon="trending-up-outline"
             iconBg="#F5F3FF"
             iconColor="#7C3AED"
@@ -361,7 +362,16 @@ const styles = StyleSheet.create({
   heroGreeting: { fontSize: Typography.sm, color: Colors.primaryBorder, fontWeight: Typography.medium },
   heroName:     { fontSize: Typography["2xl"], fontWeight: Typography.bold, color: Colors.white, marginTop: 2 },
   heroDate:     { fontSize: Typography.xs, color: Colors.primaryBorder, marginTop: 4 },
-  logoutBtn:    { padding: Spacing.sm },
+  logoutBtn:    {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    height: 32,
+    paddingHorizontal: 10,
+    borderRadius: Radius.md,
+    backgroundColor: "rgba(255,255,255,0.15)",
+  },
+  logoutText:   { fontSize: Typography.xs, fontWeight: Typography.semibold, color: "rgba(255,255,255,0.95)" },
 
   // Alert banner
   alertBanner: {

@@ -2,7 +2,7 @@ import React, { useState, useRef } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
-  ScrollView,
+  ScrollView, Image,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useAuthStore } from "../../store/authStore";
@@ -44,9 +44,14 @@ export default function LoginScreen() {
       >
         {/* Brand */}
         <View style={styles.brand}>
-          <View style={styles.brandIcon}>
-            <Ionicons name="map" size={28} color={Colors.white} accessible={false} />
-          </View>
+          <Image
+            source={require("../../../assets/icon.png")}
+            style={styles.brandLogo}
+            resizeMode="contain"
+            accessibilityLabel="Skintific"
+          />
+          <Text style={styles.brandWordmark}>SKINTIFIC</Text>
+          <View style={styles.brandDivider} />
           <Text style={styles.brandName}>STEP</Text>
           <Text style={styles.brandSub}>Territory &amp; Execution Platform</Text>
         </View>
@@ -142,6 +147,22 @@ const styles = StyleSheet.create({
   brand: {
     alignItems: "center",
     marginBottom: Spacing["3xl"],
+  },
+  brandLogo: {
+    width: 72, height: 72,
+    borderRadius: Radius.lg,
+    marginBottom: Spacing.md,
+  },
+  brandWordmark: {
+    fontSize: Typography.xl,
+    fontWeight: Typography.bold,
+    color: Colors.primary,
+    letterSpacing: 3,
+  },
+  brandDivider: {
+    width: 40, height: 2, borderRadius: 1,
+    backgroundColor: Colors.primaryBorder,
+    marginVertical: Spacing.sm,
   },
   brandIcon: {
     width: 56, height: 56,

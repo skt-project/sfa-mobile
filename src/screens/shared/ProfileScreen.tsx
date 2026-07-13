@@ -93,12 +93,12 @@ export default function ProfileScreen({ navigation }: Props) {
 
   const handleLogout = () => {
     Alert.alert(
-      "Keluar",
+      "Logout",
       "Yakin ingin keluar dari akun ini?",
       [
         { text: "Batal", style: "cancel" },
         {
-          text: "Keluar",
+          text: "Logout",
           style: "destructive",
           onPress: () => logout(),
         },
@@ -188,10 +188,10 @@ export default function ProfileScreen({ navigation }: Props) {
             style={styles.logoutRow}
             onPress={handleLogout}
             accessibilityRole="button"
-            accessibilityLabel="Keluar dari akun"
+            accessibilityLabel="Logout dari akun"
           >
             <Ionicons name="log-out-outline" size={20} color={Colors.danger} accessible={false} />
-            <Text style={styles.logoutText}>Keluar</Text>
+            <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
         </View>
       </View>

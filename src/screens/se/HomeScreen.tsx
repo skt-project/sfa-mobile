@@ -133,10 +133,11 @@ export default function SEHomeScreen({ navigation }: Props) {
                 ])
               }
               testID="btn-logout"
-              accessibilityLabel="Keluar"
+              accessibilityLabel="Logout"
               accessibilityRole="button"
             >
-              <Ionicons name="log-out-outline" size={20} color="rgba(255,255,255,0.8)" accessible={false} />
+              <Ionicons name="log-out-outline" size={16} color="rgba(255,255,255,0.9)" accessible={false} />
+              <Text style={styles.logoutText}>Logout</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -163,7 +164,7 @@ export default function SEHomeScreen({ navigation }: Props) {
           <KpiTile label="Efektif"     value={kpi?.effective_calls ?? 0} color={Colors.success} />
           <KpiTile label="Strike Rate" value={kpi?.strike_rate ?? 0}    color={Colors.warning} unit="%" />
           <KpiTile
-            label="Total Demand"
+            label="Total Order"
             value={kpi?.total_demand != null
               ? `${(kpi.total_demand / 1_000_000).toFixed(1)}M`
               : "0"}
@@ -233,12 +234,16 @@ const styles = StyleSheet.create({
   greeting: { fontSize: Typography.xl, fontWeight: Typography.bold, color: Colors.white },
   dateText: { fontSize: Typography.sm, color: "rgba(255,255,255,0.7)", marginTop: 3 },
   logoutBtn: {
-    width: 36, height: 36,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    height: 32,
+    paddingHorizontal: 10,
     borderRadius: Radius.md,
     backgroundColor: "rgba(255,255,255,0.15)",
-    alignItems: "center",
     justifyContent: "center",
   },
+  logoutText: { fontSize: Typography.xs, fontWeight: Typography.semibold, color: "rgba(255,255,255,0.95)" },
   routeRow: {
     flexDirection: "row",
     justifyContent: "space-between",

@@ -213,7 +213,7 @@ export default function RevisionEditScreen({ route, navigation }: Props) {
         <View style={styles.headerLeft}>
           <Text style={styles.headerStore} numberOfLines={1}>{outlet_name}</Text>
           <Text style={styles.headerSub}>
-            {filledCount > 0 ? `${filledCount} SKU · ${totalQty} pcs` : "Edit demand lalu submit ulang"}
+            {filledCount > 0 ? `${filledCount} SKU · ${totalQty} pcs` : "Edit order lalu submit ulang"}
           </Text>
         </View>
       </View>
@@ -264,7 +264,7 @@ export default function RevisionEditScreen({ route, navigation }: Props) {
             onPress={handleResubmit}
             disabled={submitting}
             testID="btn-resubmit"
-            accessibilityLabel={submitting ? "Sedang memproses..." : filledCount > 0 ? `Submit ulang ke SPV, ${filledCount} SKU, ${totalQty} pcs` : "Submit ulang ke SPV tanpa demand"}
+            accessibilityLabel={submitting ? "Sedang memproses..." : filledCount > 0 ? `Submit ulang ke SPV, ${filledCount} SKU, ${totalQty} pcs` : "Submit ulang ke SPV tanpa order"}
             accessibilityRole="button"
           >
             {submitting ? (
@@ -273,7 +273,7 @@ export default function RevisionEditScreen({ route, navigation }: Props) {
               <>
                 <Text style={styles.submitBtnText}>SUBMIT ULANG KE SPV</Text>
                 <Text style={styles.submitBtnSub}>
-                  {filledCount > 0 ? `${filledCount} SKU · ${totalQty} pcs` : "Submit tanpa demand"}
+                  {filledCount > 0 ? `${filledCount} SKU · ${totalQty} pcs` : "Submit tanpa order"}
                 </Text>
               </>
             )}

@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Colors, Spacing, Radius, Shadow, Typography } from "../../theme";
 import { getApiClient } from "../../api/client";
 import { useOfflineStore } from "../../store/offlineStore";
+import { useAuthStore } from "../../store/authStore";
 import { checkout as apiCheckout } from "../../api/visit";
 import { updateLocalVisitSyncStatus } from "../../db/visits";
 import type { Sku, VisitItem, ScheduleStore, EffectiveCall } from "../../types";
@@ -33,6 +34,14 @@ interface Props {
 }
 
 const ALL_TAB = "Semua";
+
+// Business-group → allowed brands (mirrors backend dependencies.BRAND_GROUPS).
+// Client-side enforcement guarantees a salesman never sees or orders brands
+// outside their group even if the API returns a broader list.
+const BRAND_GROUPS: Record<string, string[]> = {
+  SKT: ["Skintific", "Timephoria", "Facerinna"],
+  G2G: ["G2G", "Bodibreze", "Nextprime"],
+};
 
 // Memoized product card — only re-renders when its own qty changes.
 const SkuCard = React.memo(function SkuCard({
@@ -98,6 +107,8 @@ const SkuCard = React.memo(function SkuCard({
 export default function VisitSurveyScreen({ route, navigation }: Props) {
   const { visitId, store, isOffline: offlineMode, localId } = route.params;
   const { updateLocalCheckout } = useOfflineStore();
+  const user = useAuthStore((s) => s.user);
+  const userBg = user?.brand_group;
 
   // qty stored as a map so switching tabs preserves entered values
   const [qtyMap, setQtyMap] = useState<Record<string, number>>({});
@@ -134,28 +145,37 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
     retry: 1,
   });
 
-  // Unique brands derived from the (already-filtered) server response.
-  // Tab list is safe — it can never show brands outside the user's group.
-  const brands = useMemo(() => {
+  // Client-side brand-group enforcement (defense-in-depth). A Skintific SE
+  // only ever sees Skintific/Timephoria/Facerinna; a G2G SE only sees
+  // G2G/Bodibreze/Nextprime. Unrestricted groups (demo/ho, or no group) see all.
+  const groupSkus = useMemo<Sku[]>(() => {
     if (!skuData) return [];
+    const allowed = userBg ? BRAND_GROUPS[userBg] : undefined;
+    if (!allowed) return skuData; // unrestricted / demo
+    return skuData.filter(
+      (s) => s.brand_group === userBg || (s.brand ? allowed.includes(s.brand) : false),
+    );
+  }, [skuData, userBg]);
+
+  // Unique brands derived from the group-filtered list.
+  const brands = useMemo(() => {
     const seen = new Set<string>();
     const list: string[] = [];
-    for (const s of skuData) {
+    for (const s of groupSkus) {
       if (s.brand && !seen.has(s.brand)) {
         seen.add(s.brand);
         list.push(s.brand);
       }
     }
     return list;
-  }, [skuData]);
+  }, [groupSkus]);
 
   // Products visible in the active tab, further narrowed by search query
   const filteredSkus = useMemo<Sku[]>(() => {
-    if (!skuData) return [];
     let base =
       activeTab === ALL_TAB
-        ? skuData
-        : skuData.filter((s) => s.brand === activeTab);
+        ? groupSkus
+        : groupSkus.filter((s) => s.brand === activeTab);
     if (search.trim()) {
       const q = search.toLowerCase();
       base = base.filter(
@@ -165,17 +185,18 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
       );
     }
     return base;
-  }, [skuData, activeTab, search]);
+  }, [groupSkus, activeTab, search]);
 
-  // Totals derived from the full product list (not just the visible tab)
+  // Totals derived from the group-filtered product list (never counts a brand
+  // outside the user's group, so the summary stays consistent with the list).
   const filledCount = useMemo(
-    () => Object.values(qtyMap).filter((q) => q > 0).length,
-    [qtyMap],
+    () => groupSkus.filter((s) => (qtyMap[s.sku_id] ?? 0) > 0).length,
+    [groupSkus, qtyMap],
   );
 
   const totalQty = useMemo(
-    () => Object.values(qtyMap).reduce((sum, q) => sum + q, 0),
-    [qtyMap],
+    () => groupSkus.reduce((sum, s) => sum + (qtyMap[s.sku_id] ?? 0), 0),
+    [groupSkus, qtyMap],
   );
 
   // Effective Call = any product with qty > 0 (qty-based, not monetary)
@@ -184,11 +205,11 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
   // totalDemand is computed for backend reporting only — never shown in UI
   const totalDemand = useMemo(
     () =>
-      (skuData ?? []).reduce(
+      groupSkus.reduce(
         (sum, s) => sum + (qtyMap[s.sku_id] ?? 0) * (s.stp ?? 0),
         0,
       ),
-    [skuData, qtyMap],
+    [groupSkus, qtyMap],
   );
 
   const setQty = useCallback((skuId: string, qty: number) => {
@@ -205,7 +226,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
   const handleCheckout = async () => {
     setLoading(true);
     const now = new Date().toISOString();
-    const filledItems: VisitItem[] = (skuData ?? [])
+    const filledItems: VisitItem[] = groupSkus
       .filter((s) => (qtyMap[s.sku_id] ?? 0) > 0)
       .map((s) => ({
         sku_id: s.sku_id,
@@ -291,7 +312,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
           <Text style={styles.headerSub}>
             {filledCount > 0
               ? `${filledCount} SKU · ${totalQty} pcs`
-              : "Belum ada demand"}
+              : "Belum ada order"}
           </Text>
         </View>
         <View
@@ -464,7 +485,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
           accessibilityLabel={
             filledCount > 0
               ? `Lanjut check-out, ${filledCount} SKU, ${totalQty} pcs`
-              : "Lanjut check-out tanpa demand"
+              : "Lanjut check-out tanpa order"
           }
           accessibilityRole="button"
         >
@@ -476,7 +497,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
               <Text style={styles.checkoutBtnSub}>
                 {filledCount > 0
                   ? `${filledCount} SKU · ${totalQty} pcs`
-                  : "Lanjut tanpa demand (tidak efektif)"}
+                  : "Lanjut tanpa order (tidak efektif)"}
               </Text>
             </>
           )}

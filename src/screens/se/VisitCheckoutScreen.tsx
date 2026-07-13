@@ -139,6 +139,11 @@ export default function VisitCheckoutScreen({ route, navigation }: Props) {
           </View>
         ))}
 
+        <View style={styles.totalRupiahRow}>
+          <Text style={styles.totalRupiahLabel}>Total Rupiah</Text>
+          <Text style={styles.totalRupiahValue}>Rp {totalDemand.toLocaleString("id-ID")}</Text>
+        </View>
+
         <View style={styles.row}>
           <Text style={styles.label}>Efektif Call</Text>
           <Text style={[styles.value, effectiveCall === "YES" ? styles.yes : styles.no]}>
@@ -155,7 +160,7 @@ export default function VisitCheckoutScreen({ route, navigation }: Props) {
       {/* ── Demand summary grouped by brand ── */}
       {brandSections.length > 0 && (
         <View style={styles.demandCard}>
-          <Text style={styles.demandCardTitle}>Demand Summary</Text>
+          <Text style={styles.demandCardTitle}>Ringkasan Order</Text>
 
           {brandSections.map(({ brand, skuCount, totalQty: brandQty, products }, idx) => (
             <View
@@ -267,6 +272,19 @@ const styles = StyleSheet.create({
   value: { fontSize: Typography.sm,   fontWeight: Typography.semibold, color: Colors.slate800 },
   yes:   { color: Colors.success },
   no:    { color: Colors.danger },
+
+  totalRupiahRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.md,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.slate100,
+  },
+  totalRupiahLabel: { fontSize: Typography.sm, fontWeight: Typography.semibold, color: Colors.slate600 },
+  totalRupiahValue: { fontSize: Typography.lg, fontWeight: Typography.bold, color: Colors.primaryDark },
 
   demandCard: {
     backgroundColor: Colors.card,
