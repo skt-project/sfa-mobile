@@ -23,13 +23,25 @@ export async function isOnline(): Promise<boolean> {
     return navigator.onLine;
   }
   const state = await NetInfo.fetch();
-  return !!state.isConnected && !!state.isInternetReachable;
+  return !!state?.isConnected && !!state?.isInternetReachable;
 }
 
-export async function flushPendingVisits(): Promise<{
+// Module-level mutex: NetInfo flaps and pull-to-refresh can both call
+// flushPendingVisits concurrently. Only one flush may run at a time —
+// concurrent callers get the in-flight promise instead of starting a
+// second pass (prevents duplicate submissions and race conditions).
+let _inFlight: Promise<{ synced: number; failed: number }> | null = null;
+
+export function flushPendingVisits(): Promise<{
   synced: number;
   failed: number;
 }> {
+  if (_inFlight) return _inFlight;
+  _inFlight = _doFlush().finally(() => { _inFlight = null; });
+  return _inFlight;
+}
+
+async function _doFlush(): Promise<{ synced: number; failed: number }> {
   const online = await isOnline();
   if (!online) return { synced: 0, failed: 0 };
 
@@ -38,6 +50,9 @@ export async function flushPendingVisits(): Promise<{
   let failed = 0;
 
   for (const local of pending) {
+    // Re-check connectivity between visits: if the network dropped mid-flush,
+    // stop cleanly and leave the rest queued instead of racking up failures.
+    if (!(await isOnline())) break;
     try {
       await syncOneVisit(local);
       synced++;

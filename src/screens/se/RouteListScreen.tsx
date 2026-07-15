@@ -308,6 +308,27 @@ export default function RouteListScreen({ navigation }: Props) {
         isSkippable={status === "not_visited" || status === "skipped"}
         onPress={() => {
           if (status === "skipped") return;
+          // Completed visits are READ-ONLY: open the summary, never re-enter
+          // the check-in flow. Only untouched / mid-visit stores continue the flow.
+          if (status === "checked_out" || status === "submitted") {
+            const visit = localVisits.find((v) => v.outlet_sk === item.outlet_sk);
+            navigation.navigate("VisitDetail", {
+              item: {
+                id: visit?.local_id ?? item.outlet_sk,
+                outlet_name: item.store_name ?? item.source_outlet_code,
+                visit_date: visit?.visit_date ?? today,
+                checkin_time: visit?.checkin_time,
+                checkout_time: visit?.checkout_time,
+                total_demand: visit?.total_demand ?? 0,
+                effective_call: visit?.effective_call ?? "NO",
+                items_json: visit?.items_json,
+                source: (visit?.sync_status === "synced" ? "server" : "local") as "server" | "local",
+                server_visit_id: visit?.server_visit_id,
+                checkin_photo_path: visit?.checkin_photo_path,
+              },
+            });
+            return;
+          }
           navigation.navigate("VisitCheckin", { store: item });
         }}
         onToggleSkip={() => toggleSkipped(item)}

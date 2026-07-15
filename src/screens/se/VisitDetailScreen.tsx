@@ -131,7 +131,10 @@ export default function VisitDetailScreen({ route }: Props) {
                 <View key={`${it.sku_id}-${idx}`} style={[styles.demandRow, idx % 2 === 0 && styles.demandRowAlt]}>
                   <View style={[styles.demandCell, styles.demandCellName]}>
                     <Text style={styles.demandSkuCode}>{it.sku_id}</Text>
-                    <Text style={styles.demandSkuName}>{it.sku_name ?? it.sku_id}</Text>
+                    <Text style={styles.demandSkuName}>
+                      {it.sku_name ?? it.sku_id}
+                      {it.pack_size ? ` · ${it.pack_size}` : ""}
+                    </Text>
                     {it.category && <Text style={styles.demandSkuCat}>{it.category}</Text>}
                   </View>
                   <Text style={[styles.demandCell, styles.demandCellQty, styles.qtyText]}>{it.qty}</Text>

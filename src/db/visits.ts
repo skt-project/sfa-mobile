@@ -74,6 +74,20 @@ export async function getPendingSyncVisits(): Promise<LocalVisit[]> {
   ) as Promise<LocalVisit[]>;
 }
 
+/**
+ * Crash recovery: rows stuck in 'syncing' mean the app was killed mid-flush.
+ * Reset them to 'local' on startup so the sync engine retries them. Safe
+ * because the server side is idempotent (checkin dedupes by schedule_id,
+ * submit short-circuits when already SUBMITTED).
+ */
+export async function resetStuckSyncing(): Promise<number> {
+  const db = await getDb();
+  const res = await db.runAsync(
+    "UPDATE local_visits SET sync_status='local' WHERE sync_status='syncing'",
+  );
+  return res?.changes ?? 0;
+}
+
 export async function getAllLocalVisits(limit = 50): Promise<LocalVisit[]> {
   const db = await getDb();
   return db.getAllAsync(

@@ -64,7 +64,8 @@ describe("flushPendingVisits", () => {
   });
 
   it("syncs pending visits when online", async () => {
-    (mockNetInfo.fetch as jest.Mock).mockResolvedValueOnce({
+    // Persistent mock: the engine re-checks connectivity before each visit
+    (mockNetInfo.fetch as jest.Mock).mockResolvedValue({
       isConnected: true,
       isInternetReachable: true,
     });
@@ -104,7 +105,7 @@ describe("flushPendingVisits", () => {
   });
 
   it("handles sync failure gracefully — marks as failed, continues", async () => {
-    (mockNetInfo.fetch as jest.Mock).mockResolvedValueOnce({
+    (mockNetInfo.fetch as jest.Mock).mockResolvedValue({
       isConnected: true,
       isInternetReachable: true,
     });
@@ -119,5 +120,20 @@ describe("flushPendingVisits", () => {
     expect(result.failed).toBe(1);
     expect(result.synced).toBe(0);
     expect(mockDb.updateLocalVisitSyncStatus).toHaveBeenCalledWith("LOCAL-FAIL", "failed");
+  });
+
+  it("stops cleanly when connection drops mid-flush — remaining visits stay queued", async () => {
+    // Online for the initial gate, offline on the per-visit re-check
+    (mockNetInfo.fetch as jest.Mock)
+      .mockResolvedValueOnce({ isConnected: true, isInternetReachable: true })
+      .mockResolvedValue({ isConnected: false, isInternetReachable: false });
+    (mockDb.getPendingSyncVisits as jest.Mock).mockResolvedValueOnce([
+      { local_id: "LOCAL-A", salesman_sk: "SM-003", outlet_sk: "OUT-003",
+        visit_date: "2026-07-04", visit_type: "ROUTE", total_demand: 0, effective_call: "NO", sync_status: "local" },
+    ]);
+
+    const result = await flushPendingVisits();
+    expect(result).toEqual({ synced: 0, failed: 0 });
+    expect(mockApi.checkin).not.toHaveBeenCalled();
   });
 });

@@ -59,6 +59,7 @@ export interface VisitItem {
   brand?: string;
   brand_group?: BrandGroup;
   category?: string;
+  pack_size?: string;   // from gt_schema.master_product (e.g. "30ml")
   stp: number;
   qty: number;
   demand?: number;
@@ -116,6 +117,7 @@ export interface Sku {
   brand?: string;
   brand_group?: BrandGroup;
   category?: string;
+  pack_size?: string;   // from gt_schema.master_product (e.g. "30ml")
   stp?: number;
   is_active?: boolean;
 }

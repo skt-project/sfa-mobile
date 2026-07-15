@@ -5,6 +5,7 @@ import {
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useQuery } from "@tanstack/react-query";
+import { useFocusEffect } from "@react-navigation/native";
 import { format } from "date-fns";
 import { id as idLocale } from "date-fns/locale";
 import { useAuthStore } from "../../store/authStore";
@@ -87,6 +88,14 @@ export default function SEHomeScreen({ navigation }: Props) {
     enabled:  !!salesmanSk,
     staleTime: 60_000,
   });
+
+  // The summary must reflect checkout/submit immediately — the user returns
+  // to Home after both, so refetch on every focus (no manual refresh needed).
+  useFocusEffect(
+    useCallback(() => {
+      if (salesmanSk) refetchKpi();
+    }, [salesmanSk, refetchKpi]),
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

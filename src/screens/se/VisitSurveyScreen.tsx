@@ -35,12 +35,15 @@ interface Props {
 
 const ALL_TAB = "Semua";
 
-// Business-group → allowed brands (mirrors backend dependencies.BRAND_GROUPS).
+// Business Unit → allowed brands (mirrors backend dependencies.BRAND_GROUPS).
+// Brand values from master_product are UPPERCASE — compare case-insensitively.
 // Client-side enforcement guarantees a salesman never sees or orders brands
-// outside their group even if the API returns a broader list.
+// outside their unit even if the API returns a broader list.
+// BU 1 (SKT): SKINTIFIC, TIMEPHORIA, FACERINNA
+// BU 2 (G2G): G2G (Glad2Glow), BODIBREZE, NEXTPRIME
 const BRAND_GROUPS: Record<string, string[]> = {
-  SKT: ["Skintific", "Timephoria", "Facerinna"],
-  G2G: ["G2G", "Bodibreze", "Nextprime"],
+  SKT: ["SKINTIFIC", "TIMEPHORIA", "FACERINNA"],
+  G2G: ["G2G", "BODIBREZE", "NEXTPRIME"],
 };
 
 // Memoized product card — only re-renders when its own qty changes.
@@ -59,6 +62,11 @@ const SkuCard = React.memo(function SkuCard({
         <Text style={styles.skuCode}>{item.sku_id}</Text>
         <Text style={styles.skuName}>{item.sku_name}</Text>
         <View style={styles.skuMeta}>
+          {item.pack_size ? (
+            <View style={styles.packBadge}>
+              <Text style={styles.packBadgeText}>{item.pack_size}</Text>
+            </View>
+          ) : null}
           {item.category ? (
             <Text style={styles.skuCat}>{item.category}</Text>
           ) : null}
@@ -145,15 +153,19 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
     retry: 1,
   });
 
-  // Client-side brand-group enforcement (defense-in-depth). A Skintific SE
-  // only ever sees Skintific/Timephoria/Facerinna; a G2G SE only sees
-  // G2G/Bodibreze/Nextprime. Unrestricted groups (demo/ho, or no group) see all.
+  // Client-side business-unit enforcement (defense-in-depth) + price validity.
+  // 1. SKUs without a valid selling price (stp <= 0) are never shown/orderable.
+  // 2. A BU-scoped SE only sees brands of their own unit (case-insensitive —
+  //    master_product brands are UPPERCASE). Unrestricted accounts see all.
   const groupSkus = useMemo<Sku[]>(() => {
     if (!skuData) return [];
+    const priced = skuData.filter((s) => (s.stp ?? 0) > 0);
     const allowed = userBg ? BRAND_GROUPS[userBg] : undefined;
-    if (!allowed) return skuData; // unrestricted / demo
-    return skuData.filter(
-      (s) => s.brand_group === userBg || (s.brand ? allowed.includes(s.brand) : false),
+    if (!allowed) return priced; // unrestricted / demo
+    return priced.filter(
+      (s) =>
+        s.brand_group === userBg ||
+        (s.brand ? allowed.includes(s.brand.toUpperCase()) : false),
     );
   }, [skuData, userBg]);
 
@@ -234,6 +246,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
         brand: s.brand,
         brand_group: s.brand_group,
         category: s.category,
+        pack_size: s.pack_size,
         stp: s.stp ?? 0,
         qty: qtyMap[s.sku_id],
       }));
@@ -641,6 +654,13 @@ const styles = StyleSheet.create({
   skuName: { fontSize: Typography.sm, fontWeight: Typography.semibold, color: Colors.slate800, lineHeight: 22 },
   skuMeta: { flexDirection: "row", alignItems: "center", gap: Spacing.sm, marginTop: 3, flexWrap: "wrap" },
   skuCat:  { fontSize: Typography.xs, color: Colors.slate500 },
+  packBadge: {
+    backgroundColor: Colors.slate100,
+    borderRadius: Radius.sm,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  packBadgeText: { fontSize: Typography.xs, fontWeight: Typography.semibold, color: Colors.slate600 },
   skuPrice:{ fontSize: Typography.xs, color: Colors.primary, fontWeight: Typography.semibold },
 
   // 44×44 minimum touch target

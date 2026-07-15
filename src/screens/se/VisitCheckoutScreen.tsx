@@ -188,7 +188,10 @@ export default function VisitCheckoutScreen({ route, navigation }: Props) {
                   >
                     <View style={styles.productInfo}>
                       <Text style={styles.productCode}>{p.sku_id}</Text>
-                      <Text style={styles.productName}>{p.sku_name}</Text>
+                      <Text style={styles.productName}>
+                        {p.sku_name}
+                        {p.pack_size ? <Text style={styles.productPack}>  ·  {p.pack_size}</Text> : null}
+                      </Text>
                     </View>
                     <View style={styles.productQtyBadge}>
                       <Text style={styles.productQtyText}>{p.qty} pcs</Text>
@@ -351,6 +354,11 @@ const styles = StyleSheet.create({
     fontWeight: Typography.medium,
     color: Colors.slate800,
     lineHeight: 19,
+  },
+  productPack: {
+    fontSize: Typography.xs,
+    fontWeight: Typography.semibold,
+    color: Colors.slate500,
   },
   productQtyBadge: {
     backgroundColor: Colors.primaryBg,
