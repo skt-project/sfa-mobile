@@ -122,6 +122,46 @@ describe("flushPendingVisits", () => {
     expect(mockDb.updateLocalVisitSyncStatus).toHaveBeenCalledWith("LOCAL-FAIL", "failed");
   });
 
+  it("persists the server visit id right after check-in so a later checkout failure can't duplicate it", async () => {
+    (mockNetInfo.fetch as jest.Mock).mockResolvedValue({
+      isConnected: true,
+      isInternetReachable: true,
+    });
+    (mockDb.getPendingSyncVisits as jest.Mock).mockResolvedValueOnce([
+      {
+        local_id: "LOCAL-DUP",
+        salesman_sk: "SM-9",
+        outlet_sk: "OUT-9",
+        visit_date: "2026-07-04",
+        visit_type: "ROUTE",
+        checkin_time: "2026-07-04T07:00:00Z",
+        checkout_time: "2026-07-04T07:30:00Z",
+        total_demand: 1000,
+        effective_call: "YES",
+        sync_status: "local",
+      },
+    ]);
+    (mockApi.checkin as jest.Mock).mockResolvedValueOnce({ visit_id: "VST-DUP-1" });
+    // Check-in succeeds, then the network drops during checkout.
+    (mockApi.checkout as jest.Mock).mockRejectedValueOnce(new Error("Network error"));
+    (mockDb.updateLocalVisitSyncStatus as jest.Mock).mockResolvedValue(undefined);
+
+    const result = await flushPendingVisits();
+
+    expect(result.failed).toBe(1);
+    // The server id was persisted with status 'syncing' BEFORE the failure, so a
+    // retry will see server_visit_id set and skip check-in (no duplicate visit).
+    expect(mockDb.updateLocalVisitSyncStatus).toHaveBeenCalledWith(
+      "LOCAL-DUP",
+      "syncing",
+      "VST-DUP-1",
+    );
+    // ...and the row is ultimately marked failed for a later retry.
+    expect(mockDb.updateLocalVisitSyncStatus).toHaveBeenCalledWith("LOCAL-DUP", "failed");
+    // Exactly one check-in — never retried within the same flush.
+    expect(mockApi.checkin).toHaveBeenCalledTimes(1);
+  });
+
   it("stops cleanly when connection drops mid-flush — remaining visits stay queued", async () => {
     // Online for the initial gate, offline on the per-visit re-check
     (mockNetInfo.fetch as jest.Mock)

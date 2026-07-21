@@ -2,9 +2,9 @@ name: SFA Mobile CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   unit-tests:
@@ -22,37 +22,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Typecheck
+        run: npx tsc --noEmit
+
       - name: Run unit tests
         run: npx jest __tests__/unit --no-coverage --ci
-
-  backend-tests:
-    name: Backend API Tests
-    runs-on: ubuntu-latest
-    env:
-      STEP_API_URL: ${{ secrets.STEP_API_URL }}
-      TEST_SE_USER: ${{ secrets.TEST_SE_USER }}
-      TEST_SE_PASS: ${{ secrets.TEST_SE_PASS }}
-      TEST_SPV_USER: ${{ secrets.TEST_SPV_USER }}
-      TEST_SPV_PASS: ${{ secrets.TEST_SPV_PASS }}
-      TEST_HO_USER: ${{ secrets.TEST_HO_USER }}
-      TEST_HO_PASS: ${{ secrets.TEST_HO_PASS }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install backend test deps
-        run: pip install requests pytest
-        working-directory: ../skintific-step/backend
-        continue-on-error: true
-
-      - name: Run backend API tests
-        run: python -m pytest test_visit_api.py -v --tb=short
-        working-directory: ../skintific-step/backend
-        continue-on-error: true
 
   build-apk:
     name: Build APK (EAS)
