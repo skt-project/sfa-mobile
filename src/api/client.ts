@@ -1,7 +1,12 @@
 import axios, { AxiosInstance } from "axios";
 import { Platform } from "react-native";
 
-export const BASE_URL = "https://step-api-141828905128.asia-southeast1.run.app/api/v1";
+// Defaults to the production Cloud Run API. A staging/QA build can override it by
+// setting EXPO_PUBLIC_API_BASE_URL (inlined at build time; must be dot-accessed).
+// The API host is public, not a secret, so EXPO_PUBLIC_ is appropriate here.
+export const BASE_URL =
+  process.env.EXPO_PUBLIC_API_BASE_URL ??
+  "https://step-api-141828905128.asia-southeast1.run.app/api/v1";
 const TOKEN_KEY = "sfa_jwt";
 
 let _axiosInstance: AxiosInstance | null = null;

@@ -35,8 +35,15 @@ export const useAuthStore = create<AuthState>((set) => ({
         const user = await getMe();
         set({ user, isAuthenticated: true });
       }
-    } catch {
-      await clearToken();
+    } catch (e) {
+      // Offline-first: only a 401 means the stored token is truly invalid (and the
+      // API client's interceptor has already cleared it). A network error just
+      // means we're offline — keep the token so the session survives once
+      // connectivity returns, instead of stranding a field user at a login screen
+      // they cannot submit while offline.
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      if (status === 401) await clearToken();
+      set({ user: null, isAuthenticated: false });
     } finally {
       set({ isLoading: false });
     }

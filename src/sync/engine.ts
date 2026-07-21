@@ -89,6 +89,11 @@ async function syncOneVisit(local: LocalVisit): Promise<void> {
       captured_at: local.checkin_time ?? undefined,
     });
     serverVisitId = checkinResp.visit_id;
+    // Persist the server id immediately. If the checkout/submit below fails
+    // (network drop), the row is marked 'failed' without this and the next flush
+    // would run check-in AGAIN — the server only dedupes check-in when
+    // schedule_id is set, so an ad-hoc visit would create a duplicate.
+    await updateLocalVisitSyncStatus(local.local_id, "syncing", serverVisitId);
   }
 
   // Step 2: checkout (records time/coords only — items go with submit)
