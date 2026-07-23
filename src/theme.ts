@@ -11,6 +11,19 @@ export const Colors = {
   primaryBg:     "#EFF6FF",
   primaryBorder: "#BFDBFE",
 
+  // STEP brand (Skintific blue) — identity & accents.
+  // 400 = accent (#7CCBFF), 500 = primary identity (#5CB8FF); 600-900 = accessible depths.
+  brand50:  "#F0F8FF",
+  brand100: "#E0F1FF",
+  brand200: "#C5E6FF",
+  brand300: "#9DD6FF",
+  brand400: "#7CCBFF",
+  brand500: "#5CB8FF",
+  brand600: "#3AA0F0",
+  brand700: "#2884D1",
+  brand800: "#236AA6",
+  brand900: "#215A86",
+
   // Semantic
   success:     "#10B981",
   successBg:   "#ECFDF5",

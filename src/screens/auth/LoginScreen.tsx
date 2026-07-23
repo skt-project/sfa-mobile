@@ -2,10 +2,11 @@ import React, { useState, useRef } from "react";
 import {
   View, Text, TextInput, TouchableOpacity, StyleSheet,
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
-  ScrollView, Image,
+  ScrollView,
 } from "react-native";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { useAuthStore } from "../../store/authStore";
+import { StepLogo } from "../../components/brand/StepLogo";
 import { Colors, Radius, Shadow, Spacing, Typography } from "../../theme";
 
 export default function LoginScreen() {
@@ -16,6 +17,7 @@ export default function LoginScreen() {
   const pwRef = useRef<TextInput>(null);
   const login = useAuthStore((s) => s.login);
 
+  // ── Business logic unchanged — UI/branding only ──
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
       Alert.alert("Perhatian", "Username dan password wajib diisi");
@@ -37,23 +39,28 @@ export default function LoginScreen() {
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      {/* Soft brand background */}
+      <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+        <View style={[styles.blob, styles.blob1]} />
+        <View style={[styles.blob, styles.blob2]} />
+      </View>
+
       <ScrollView
         contentContainerStyle={styles.container}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Brand */}
+        {/* Brand lockup — STEP leads, Skintific subtle */}
         <View style={styles.brand}>
-          <Image
-            source={require("../../../assets/icon.png")}
-            style={styles.brandLogo}
-            resizeMode="contain"
-            accessibilityLabel="Skintific"
-          />
-          <Text style={styles.brandWordmark}>SKINTIFIC</Text>
-          <View style={styles.brandDivider} />
+          <StepLogo size={72} style={{ marginBottom: Spacing.lg }} />
           <Text style={styles.brandName}>STEP</Text>
-          <Text style={styles.brandSub}>Territory &amp; Execution Platform</Text>
+          <Text style={styles.brandTagline}>Sales Team Execution Platform</Text>
+          <Text style={styles.brandSubhead}>
+            Empowering sales teams to execute, monitor,{"\n"}and optimize every step of the call.
+          </Text>
+          <Text style={styles.brandBy}>
+            by <Text style={styles.brandByName}>Skintific</Text>
+          </Text>
         </View>
 
         {/* Card */}
@@ -115,7 +122,7 @@ export default function LoginScreen() {
             style={[styles.button, loading && styles.buttonDisabled]}
             onPress={handleLogin}
             disabled={loading}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             testID="btn-login"
             accessibilityLabel={loading ? "Sedang memproses..." : "Masuk"}
             accessibilityRole="button"
@@ -135,62 +142,58 @@ export default function LoginScreen() {
           </Text>
         </View>
 
-        <Text style={styles.version}>Hanya untuk Penggunaan Internal · v1.0</Text>
+        <Text style={styles.version}>
+          Hanya untuk Penggunaan Internal · by <Text style={styles.versionBy}>Skintific</Text>
+        </Text>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  root:      { flex: 1, backgroundColor: Colors.slate50 },
-  container: { flexGrow: 1, justifyContent: "center", padding: Spacing["2xl"], paddingTop: 60 },
-  brand: {
-    alignItems: "center",
-    marginBottom: Spacing["3xl"],
-  },
-  brandLogo: {
-    width: 72, height: 72,
-    borderRadius: Radius.lg,
-    marginBottom: Spacing.md,
-  },
-  brandWordmark: {
-    fontSize: Typography.xl,
-    fontWeight: Typography.bold,
-    color: Colors.primary,
-    letterSpacing: 3,
-  },
-  brandDivider: {
-    width: 40, height: 2, borderRadius: 1,
-    backgroundColor: Colors.primaryBorder,
-    marginVertical: Spacing.sm,
-  },
-  brandIcon: {
-    width: 56, height: 56,
-    borderRadius: Radius.lg,
-    backgroundColor: Colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: Spacing.md,
-    ...Shadow.md,
-  },
+  root: { flex: 1, backgroundColor: Colors.brand50 },
+  container: { flexGrow: 1, justifyContent: "center", padding: Spacing["2xl"], paddingTop: 56, paddingBottom: 40 },
+
+  // Background blobs
+  blob: { position: "absolute", borderRadius: 9999 },
+  blob1: { width: 320, height: 320, backgroundColor: Colors.brand200, opacity: 0.5, top: -90, left: -80 },
+  blob2: { width: 380, height: 380, backgroundColor: Colors.brand100, opacity: 0.7, bottom: -120, right: -100 },
+
+  // Brand lockup
+  brand: { alignItems: "center", marginBottom: Spacing["3xl"] },
   brandName: {
-    fontSize: Typography["2xl"],
-    fontWeight: Typography.bold,
-    color: Colors.slate900,
+    fontSize: 46,
+    fontWeight: "800",
+    color: Colors.brand700,
     letterSpacing: 1,
+    lineHeight: 50,
   },
-  brandSub: {
+  brandTagline: {
     fontSize: Typography.xs,
-    color: Colors.slate500,
-    marginTop: 4,
+    fontWeight: Typography.semibold,
+    color: Colors.brand700,
+    letterSpacing: 1.6,
+    textTransform: "uppercase",
+    marginTop: 10,
   },
+  brandSubhead: {
+    fontSize: Typography.sm,
+    color: Colors.slate500,
+    textAlign: "center",
+    marginTop: 12,
+    lineHeight: 19,
+  },
+  brandBy: { fontSize: Typography.xs, color: Colors.slate400, marginTop: 14 },
+  brandByName: { fontWeight: Typography.semibold, color: Colors.slate500 },
+
+  // Card
   card: {
     backgroundColor: Colors.white,
-    borderRadius: Radius.xl,
+    borderRadius: 24,
     padding: Spacing["2xl"],
     borderWidth: 1,
-    borderColor: Colors.border,
-    ...Shadow.md,
+    borderColor: Colors.brand100,
+    ...Shadow.lg,
   },
   cardTitle: {
     fontSize: Typography.base,
@@ -226,7 +229,7 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: Colors.primary,
     borderRadius: Radius.md,
-    paddingVertical: 14,
+    paddingVertical: 15,
     alignItems: "center",
     marginTop: Spacing.sm,
     ...Shadow.sm,
@@ -250,4 +253,5 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: Spacing["2xl"],
   },
+  versionBy: { fontWeight: Typography.semibold, color: Colors.slate500 },
 });
