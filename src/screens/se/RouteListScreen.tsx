@@ -273,10 +273,11 @@ export default function RouteListScreen({ navigation }: Props) {
                   visit_date:       today,
                 }));
               const result = await submitSkippedStores(salesmanSk, skippedStores);
+              const alreadySent = result.total - result.inserted;
               setSkippedSet(new Set());
               Alert.alert(
                 "Berhasil",
-                `${result.created} toko berhasil dikirim ke SPV.${result.skipped > 0 ? ` (${result.skipped} sudah ada sebelumnya)` : ""}`,
+                `${result.inserted} toko berhasil dikirim ke SPV.${alreadySent > 0 ? ` (${alreadySent} sudah ada sebelumnya)` : ""}`,
               );
             } catch (e: any) {
               Alert.alert("Gagal", e?.response?.data?.detail ?? "Gagal mengirim. Coba lagi.");

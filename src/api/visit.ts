@@ -104,7 +104,7 @@ export interface SkippedStoreIn {
 export async function submitSkippedStores(
   salesman_sk: string,
   stores: SkippedStoreIn[],
-): Promise<{ created: number; skipped: number }> {
+): Promise<{ inserted: number; total: number }> {
   const r = await getApiClient().post("/skipped-stores", { salesman_sk, stores });
   return r.data;
 }
