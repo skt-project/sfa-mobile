@@ -8,6 +8,7 @@ export const BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ??
   "https://step-api-141828905128.asia-southeast1.run.app/api/v1";
 const TOKEN_KEY = "sfa_jwt";
+const USER_KEY = "sfa_user";
 
 let _axiosInstance: AxiosInstance | null = null;
 let _onUnauthorized: (() => void) | null = null;
@@ -44,6 +45,43 @@ async function _clearToken(): Promise<void> {
   await deleteItemAsync(TOKEN_KEY);
 }
 
+// Cached user profile — lets an OFFLINE app relaunch restore the session instead
+// of stranding a field user at a login screen they can't submit (E2E-25).
+export async function saveUser(user: unknown): Promise<void> {
+  const raw = JSON.stringify(user);
+  if (Platform.OS === "web") {
+    localStorage.setItem(USER_KEY, raw);
+    return;
+  }
+  const { setItemAsync } = await import("expo-secure-store");
+  await setItemAsync(USER_KEY, raw);
+}
+
+export async function getStoredUser<T = unknown>(): Promise<T | null> {
+  let raw: string | null;
+  if (Platform.OS === "web") {
+    raw = localStorage.getItem(USER_KEY);
+  } else {
+    const { getItemAsync } = await import("expo-secure-store");
+    raw = await getItemAsync(USER_KEY);
+  }
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+export async function clearUser(): Promise<void> {
+  if (Platform.OS === "web") {
+    localStorage.removeItem(USER_KEY);
+    return;
+  }
+  const { deleteItemAsync } = await import("expo-secure-store");
+  await deleteItemAsync(USER_KEY);
+}
+
 export function getApiClient(): AxiosInstance {
   if (_axiosInstance) return _axiosInstance;
 
@@ -66,7 +104,22 @@ export function getApiClient(): AxiosInstance {
     async (error) => {
       if (error.response?.status === 401) {
         await _clearToken();
+        await clearUser();
         _onUnauthorized?.();
+        return Promise.reject(error);
+      }
+      // E2E-27: retry idempotent GETs once on a transient network error before
+      // giving up. Writes are NOT retried here — the offline sync engine owns
+      // write retries, and a blind POST retry could double-apply.
+      const cfg = error.config as (typeof error.config & { _retried?: boolean }) | undefined;
+      const isNetwork =
+        !error.response &&
+        (error?.code === "ECONNABORTED" || error?.code === "ERR_NETWORK" || !error?.code);
+      const method = (cfg?.method ?? "get").toLowerCase();
+      if (isNetwork && method === "get" && cfg && !cfg._retried) {
+        cfg._retried = true;
+        await new Promise((r) => setTimeout(r, 800));
+        return _axiosInstance!(cfg);
       }
       return Promise.reject(error);
     },

@@ -20,6 +20,16 @@ import { checkout as apiCheckout } from "../../api/visit";
 import { updateLocalVisitSyncStatus } from "../../db/visits";
 import type { Sku, VisitItem, ScheduleStore, EffectiveCall } from "../../types";
 import { getCachedSkus, cacheSkus } from "../../db/schedule_cache";
+import { ProductBadges } from "../../components/shared/ProductBadge";
+
+// Product-type filter (SKU Focus / NPD / …). Data-driven: codes come from the
+// flags present in the loaded catalogue, so new categories work with no change.
+function matchesType(s: Sku, code: string): boolean {
+  if (!code || code === "ALL") return true;
+  const types = new Set((s.flags ?? []).map((f) => f.type));
+  if (code === "NORMAL") return types.size === 0;
+  return code.split("+").every((r) => types.has(r));
+}
 
 interface Props {
   route: {
@@ -61,6 +71,7 @@ const SkuCard = React.memo(function SkuCard({
       <View style={styles.skuInfo}>
         <Text style={styles.skuCode}>{item.sku_id}</Text>
         <Text style={styles.skuName}>{item.sku_name}</Text>
+        <ProductBadges flags={item.flags} />
         <View style={styles.skuMeta}>
           {item.pack_size ? (
             <View style={styles.packBadge}>
@@ -125,6 +136,7 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
   const [activeTab, setActiveTab] = useState(ALL_TAB);
   const [search, setSearch] = useState("");
   const [tabsOpen, setTabsOpen] = useState(true);
+  const [typeFilter, setTypeFilter] = useState("ALL");
 
   const {
     data: skuData,
@@ -182,7 +194,22 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
     return list;
   }, [groupSkus]);
 
-  // Products visible in the active tab, further narrowed by search query
+  // Product-type filter chips (Semua / <each present type> / Kombinasi / Reguler).
+  // Derived from the flags actually present, so it stays future-proof.
+  const typeChips = useMemo(() => {
+    const present = new Map<string, string>();
+    for (const s of groupSkus)
+      for (const f of s.flags ?? [])
+        if (!present.has(f.type)) present.set(f.type, f.short_label || f.label || f.type);
+    if (present.size === 0) return [];  // no flagged products → hide the chip row
+    const chips: { code: string; label: string }[] = [{ code: "ALL", label: "Semua Tipe" }];
+    for (const [code, label] of present) chips.push({ code, label });
+    if (present.size >= 2) chips.push({ code: Array.from(present.keys()).join("+"), label: "Kombinasi" });
+    chips.push({ code: "NORMAL", label: "Reguler" });
+    return chips;
+  }, [groupSkus]);
+
+  // Products visible in the active tab, further narrowed by search + product type
   const filteredSkus = useMemo<Sku[]>(() => {
     let base =
       activeTab === ALL_TAB
@@ -196,8 +223,9 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
           s.sku_id.toLowerCase().includes(q),
       );
     }
+    if (typeFilter !== "ALL") base = base.filter((s) => matchesType(s, typeFilter));
     return base;
-  }, [groupSkus, activeTab, search]);
+  }, [groupSkus, activeTab, search, typeFilter]);
 
   // Totals derived from the group-filtered product list (never counts a brand
   // outside the user's group, so the summary stays consistent with the list).
@@ -214,11 +242,13 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
   // Effective Call = any product with qty > 0 (qty-based, not monetary)
   const effectiveCall: EffectiveCall = filledCount > 0 ? "YES" : "NO";
 
-  // totalDemand is computed for backend reporting only — never shown in UI
+  // totalDemand is computed for backend reporting only — never shown in UI.
+  // E2E-33: round per item (2dp) to match the server's sum(round(qty*stp,2)) so
+  // the handheld total and the web/PDF total can never drift apart.
   const totalDemand = useMemo(
     () =>
       groupSkus.reduce(
-        (sum, s) => sum + (qtyMap[s.sku_id] ?? 0) * (s.stp ?? 0),
+        (sum, s) => sum + Math.round((qtyMap[s.sku_id] ?? 0) * (s.stp ?? 0) * 100) / 100,
         0,
       ),
     [groupSkus, qtyMap],
@@ -424,6 +454,28 @@ export default function VisitSurveyScreen({ route, navigation }: Props) {
         )}
       </View>
 
+      {/* ── Product-type filter chips (SKU Focus / NPD / …) — only when present ── */}
+      {typeChips.length > 0 && (
+        <View style={styles.typeFilterOuter}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.typeFilterContent}>
+            {typeChips.map((chip) => (
+              <TouchableOpacity
+                key={chip.code}
+                style={[styles.typeChip, typeFilter === chip.code && styles.typeChipActive]}
+                onPress={() => setTypeFilter(chip.code)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: typeFilter === chip.code }}
+                accessibilityLabel={`Filter ${chip.label}`}
+              >
+                <Text style={[styles.typeChipText, typeFilter === chip.code && styles.typeChipTextActive]}>
+                  {chip.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {/* ── Virtualized product list ── */}
       <FlatList
         data={filteredSkus}
@@ -569,6 +621,19 @@ const styles = StyleSheet.create({
   tabActive:         { backgroundColor: Colors.primaryBg },
   tabText:           { fontSize: Typography.sm, color: Colors.slate500, fontWeight: Typography.medium },
   tabTextActive:     { color: Colors.primary, fontWeight: Typography.bold },
+
+  typeFilterOuter:   { backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  typeFilterContent: { paddingHorizontal: Spacing.lg, paddingVertical: 8, gap: 6 },
+  typeChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: Colors.muted,
+    marginRight: 6,
+  },
+  typeChipActive:     { backgroundColor: Colors.primaryBg },
+  typeChipText:       { fontSize: Typography.xs, color: Colors.slate600, fontWeight: Typography.semibold },
+  typeChipTextActive: { color: Colors.primary, fontWeight: Typography.bold },
 
   searchRow: {
     backgroundColor: Colors.white,

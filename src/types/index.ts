@@ -111,6 +111,16 @@ export interface CheckinResponse {
   offline_mode: boolean;
 }
 
+// Product-identification overlay (SKU Focus / NPD / future categories).
+export interface ProductFlag {
+  type: string;
+  label?: string | null;
+  short_label?: string | null;
+  color?: string | null;
+  icon?: string | null;
+  priority?: number;
+}
+
 export interface Sku {
   sku_id: string;
   sku_name: string;
@@ -120,6 +130,7 @@ export interface Sku {
   pack_size?: string;   // from gt_schema.master_product (e.g. "30ml")
   stp?: number;
   is_active?: boolean;
+  flags?: ProductFlag[];   // SKU Focus / NPD / … — rides along in the offline cache
 }
 
 export interface StockItem {

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { login as apiLogin, logout as apiLogout, getMe } from "../api/auth";
-import { clearToken, getStoredToken } from "../api/client";
+import { clearToken, clearUser, getStoredToken, getStoredUser, saveUser } from "../api/client";
 import type { User } from "../types";
 
 interface AuthState {
@@ -31,19 +31,29 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true });
     try {
       const token = await getStoredToken();
-      if (token) {
-        const user = await getMe();
-        set({ user, isAuthenticated: true });
+      if (!token) {
+        set({ user: null, isAuthenticated: false });
+        return;
       }
-    } catch (e) {
-      // Offline-first: only a 401 means the stored token is truly invalid (and the
-      // API client's interceptor has already cleared it). A network error just
-      // means we're offline — keep the token so the session survives once
-      // connectivity returns, instead of stranding a field user at a login screen
-      // they cannot submit while offline.
-      const status = (e as { response?: { status?: number } })?.response?.status;
-      if (status === 401) await clearToken();
-      set({ user: null, isAuthenticated: false });
+      try {
+        const user = await getMe();
+        try { await saveUser(user); } catch { /* refresh cache best-effort */ }
+        set({ user, isAuthenticated: true });
+      } catch (e) {
+        const status = (e as { response?: { status?: number } })?.response?.status;
+        if (status === 401) {
+          // Token truly invalid/revoked — the interceptor already cleared it.
+          await clearToken();
+          await clearUser();
+          set({ user: null, isAuthenticated: false });
+        } else {
+          // Offline (network error): restore the last known user from cache so the
+          // field user keeps a working session instead of being stranded at a
+          // login screen they can't submit while offline (E2E-25).
+          const cached = await getStoredUser<User>();
+          set(cached ? { user: cached, isAuthenticated: true } : { user: null, isAuthenticated: false });
+        }
+      }
     } finally {
       set({ isLoading: false });
     }
